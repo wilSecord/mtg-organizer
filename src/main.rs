@@ -1,4 +1,7 @@
-use std::io;
+use std::io::{self, BufRead, BufReader};
+use std::fs::File;
+use nucleo_matcher::pattern::{Normalization, CaseMatching, Pattern, AtomKind};
+use nucleo_matcher::{Matcher, Config};
 use crossterm::event::{self, Event, KeyCode, KeyEventKind};
 use ratatui::{
     layout::{Constraint, Direction, Layout},
@@ -15,6 +18,21 @@ fn main() -> io::Result<()> {
     app_result
 }
 
+// fn main() -> io::Result<()> {
+//     let file_path = "cards.txt"; 
+// 
+//     let file = File::open(file_path).expect("File not found.");
+//     let buf = BufReader::new(file);
+//     let contents: Vec<String> = buf.lines().map(|l| l.expect("Could not parse")).collect();
+// 
+//     let mut matcher = Matcher::new(Config::DEFAULT);
+// 
+//     let matches = Pattern::parse("Angel", CaseMatching::Ignore, Normalization::Smart).match_list(contents, &mut matcher);
+//     println!("{:?}", matches);
+// 
+//     Ok(())
+// }
+
 enum InputMode {
     Normal,
     Editing,
@@ -27,16 +45,24 @@ struct App {
 }
 
 impl App {    
-
     const fn new() -> Self {
         Self {
             search: String::new(),
             input_mode: InputMode::Normal,
-            exit: false
+            exit: false,
         }
     }
 
     pub fn run(&mut self, term: &mut DefaultTerminal) -> io::Result<()> {
+        //TODO: Make the matcher object and contents able to be read by get_results()
+        // let file_path = "cards.txt"; 
+    
+        // let file = File::open(file_path).expect("File not found.");
+        // let buf = BufReader::new(file);
+        // self.contents = buf.lines().map(|l| l.expect("Could not parse")).collect();
+    
+        // let mut matcher = Matcher::new(Config::DEFAULT);
+
         while !self.exit {
             term.draw(|frame| self.draw(frame))?;
             self.handle_events()?;
@@ -90,16 +116,20 @@ impl App {
 
     }
 
+    fn get_results(&self) {
+        // let matches = Pattern::parse(&self.search, CaseMatching::Ignore, Normalization::Smart).match_list(self.contents, matcher);
+        todo!();
+    }
+
     fn delete_char(& mut self) {
         self.search.pop();
+        self.get_results()
+        // self.results = self.get_results(matcher);
     }
 
     fn add_char(& mut self, c: char) {
         self.search.push(c);
-    }
-
-    fn send_search(&self) {
-        todo!();
+        self.get_results()
     }
 
     fn handle_events(&mut self) -> io::Result<()> {
@@ -115,7 +145,7 @@ impl App {
                     _ => {}
                 }
                 InputMode::Editing if key.kind == KeyEventKind::Press => match key.code {
-                    KeyCode::Enter => self.send_search(),
+                    KeyCode::Enter => self.input_mode = InputMode::Normal,
                     KeyCode::Backspace => self.delete_char(),
                     KeyCode::Char(c) => self.add_char(c),
                     KeyCode::Esc => self.input_mode = InputMode::Normal,
