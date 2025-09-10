@@ -11,6 +11,8 @@ use ratatui::{
     DefaultTerminal, Frame,
 };
 
+mod data_model;
+
 fn main() -> io::Result<()> {
     let mut term = ratatui::init();
     let app_result = App::new().run(&mut term);
