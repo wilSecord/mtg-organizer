@@ -1,3 +1,5 @@
+use std::num::NonZero;
+
 struct Card {
     name: String,
     mana_cost: ManaCost,
@@ -14,7 +16,7 @@ struct Card {
     loyalty: usize,
     defense: usize,
     sets_released: Vec<String>,
-    game_changer: bool
+    game_changer: bool,
 }
 
 enum Rarity {
@@ -22,7 +24,7 @@ enum Rarity {
     Mythic,
     Rare,
     Special,
-    Uncommon
+    Uncommon,
 }
 
 struct ColorCombination {
@@ -33,12 +35,27 @@ struct ColorCombination {
     black: bool,
 }
 
-struct ManaCost {
-    variable_cost: bool,
-    any: usize,
-    white: usize,
-    blue: usize,
-    red: usize,
-    green: usize,
-    black: usize
+struct NormalManaCost{
+        any: usize,
+        white: usize,
+        blue: usize,
+        red: usize,
+        green: usize,
+        black: usize,
+    }
+
+enum ManaCost {
+    Normal(NormalManaCost),
+    Complicated {
+        normal_component: NormalManaCost,
+        colorless: usize,
+        variables: Vec<char>,
+        symbol_level_info: Vec<ManaSymbol>
+    },
+}
+
+struct ManaSymbol {
+    phyrexian: bool,
+    color: ColorCombination,
+    uncolored_number: Option<NonZero<usize>>
 }
