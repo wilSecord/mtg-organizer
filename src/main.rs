@@ -40,6 +40,7 @@ enum InputMode {
     Editing,
 }
 
+// Setup App struct
 struct App {
     search: String,
     input_mode: InputMode,
@@ -48,7 +49,9 @@ struct App {
     results: Vec<String>,
 }
 
+// Implement App
 impl App {    
+    // new function initializing most things
     const fn new() -> Self {
         Self {
             search: String::new(),
@@ -61,63 +64,76 @@ impl App {
 
     pub fn run(&mut self, term: &mut DefaultTerminal) -> io::Result<()> {
         //TODO: Make the matcher object and contents able to be read by get_results()
+
+        // TEMP
+        // TEMP
         let file_path = "cards.txt"; 
     
         let file = File::open(file_path).expect("File not found.");
         let buf = BufReader::new(file);
         self.contents = buf.lines().map(|l| l.expect("Could not parse")).collect();
+        // TEMP
+        // TEMP
 
         let mut matcher = Matcher::new(Config::DEFAULT);
 
+        // As long as self.exit == true, run the gameloop stuff (drawing, handling inputs)
         while !self.exit {
-            term.draw(|frame| self.draw(frame))?;
-            self.handle_events(&mut matcher)?;
+            term.draw(|frame| self.draw(frame))?; // Drawing
+            self.handle_events(&mut matcher)?;    // Handling inputs
         }
-        Ok(())
+        Ok(()) // ok :+1:
     }
 
     fn draw(&self, frame: &mut Frame) {
+        // Full layout 
         let total = Layout::default()
             .direction(Direction::Horizontal)
             .constraints([
                 Constraint::Percentage(75),
                 Constraint::Percentage(25),
             ]).split(frame.area());
-
+        
+        // Setting up the left side of the screen
         let left = Layout::default()
-            .direction(Direction::Vertical)
+            .direction(Direction::Vertical) // Multiple tiles on top of each other
             .constraints([
-                Constraint::Length(1),
-                Constraint::Length(3),
-                Constraint::Min(1),
+                Constraint::Length(1), // Help line
+                Constraint::Length(3), // Input box
+                Constraint::Min(1),    // Results box
             ])
             .split(total[0]);
 
-        let help_area = left[0];
-        let input_area = left[1];
-        let body_area = left[2];
-        let decklist_area = total[1];
+        let help_area = left[0];      // Area for keybinds/help text
+        let input_area = left[1];     // Area for input box                 || TODO: Refactor to searchbar
+        let body_area = left[2];      // Area for results box               || TODO: Rename this
+        let decklist_area = total[1]; // Area for decklist (rename this?)
 
+        // Outline the searchbar/input box
         let search = Paragraph::new(self.search.as_str())
+            // Change style based on if the person is typing in it or not
             .style(match self.input_mode {
                 InputMode::Normal => Style::default(),
                 InputMode::Editing => Style::default().fg(Color::Yellow),
             })
-            .block(Block::bordered().title("Input"));
-        frame.render_widget(search, input_area);
-
+            .block(Block::bordered().title("Input")); // Set border as box
+        
+        // Help text area
+        // TODO: Change this lol
         let (msg, style) = match self.input_mode {
             InputMode::Normal => ("Normal", Style::default()),
             InputMode::Editing => ("Editing", Style::default()),
         };
         let text = Text::from(Line::from(msg)).patch_style(style);
         let help_msg = Paragraph::new(text);
-        frame.render_widget(help_msg, help_area);
-
+        
+        // Results area
         let body = Paragraph::new("test").block(Block::bordered().title("Results"));
 
+        // Render stuff
+        frame.render_widget(help_msg, help_area);
+        frame.render_widget(search, input_area);
         frame.render_widget(body, body_area);
-
         frame.render_widget(Paragraph::new("thing").block(Block::bordered().title("Decklist")), decklist_area);
 
     }
