@@ -1,4 +1,4 @@
-1. As a **user**, I want to search for cards from all cards produced.
+1. As a **user**, I want to search for cards from all cards printed.
   - So that I can find details about cards
   - [AC]: Cards can be searched by their name
   
@@ -15,7 +15,7 @@
   - [AC]: Printings can be selected; visual appearance updates based on selection
   
 5. As a **competitive player**, I want to make certain decks "exclusive"
-  - So that I can easily see which cards are available for future decks.
+  - So that I can easily see which cards are available for building other decks.
   - [AC]: A deck can be toggled to exclusive. Afterwards, its cards aren't available for other decks. The operation fails if any cards are shared in other decks.
   
 6. As a **noncompetitive player**, I want to make certain decks "non-exclusive"
@@ -28,7 +28,7 @@
   
 8. As a **long-time player & collector**, I want to import files from existing deck-management services
   - So that I don't _have_ to manually select my large collection
-  - [AC]: .dek files can be imported
+  - [AC]: .dek and .txt files can be imported
   
 9. As a **newer player**, I want to search and filter based on card criteria
   - So that I can find a card that matches what I want
