@@ -16,8 +16,8 @@
 6. As a **noncompetitive player**, I want to make certain decks "non-exclusive"
   - So that I can easily share generic cards across decks.
   
-7. As a **long-time player & collector**, I want to manage a large collection of cards [NFR]
-  - So that I can grow my collection to any size without worrying about lag
+7. As a **long-time player & collector**, I want to manage a large collection of cards
+  - So that I can grow my collection to any size without worrying about lag [NFR]
   
 8. As a **long-time player & collector**, I want to import files from existing deck-management services
   - So that I don't _have_ to manually select my large collection
