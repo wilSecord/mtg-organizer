@@ -12,6 +12,7 @@ use ratatui::{
 };
 
 mod data_model;
+mod dbs;
 
 fn main() -> io::Result<()> {
     let mut term = ratatui::init();

@@ -1,6 +1,27 @@
 use std::num::NonZero;
 
-struct Card {
+use crate::data_model::oddities::{Stringish, StringishUsize};
+
+///
+/// Reference to a specific card, can be as specific as needed or vague to be only set + collector number.
+/// Something will be made where code can exchange this for a full `Card`
+///
+pub struct CardRef {
+    set: String,
+    collector_number: StringishUsize,
+    printing: Option<NonZero<usize>>,
+}
+
+///
+/// One physical card. Users may have more than one `PhysicalCard` with the same `CardRef` in their collection; this might be
+/// implemented differently (i.e. many `PhysicalCards` or one `PhysicalCard` with `duplicates`)
+/// depending on how the user choses to arrange their collection.
+pub struct PhysicalCard {
+    card: CardRef,
+    duplicates: usize,
+}
+
+pub struct Card {
     name: String,
     mana_cost: ManaCost,
     mana_value: f64,
@@ -19,7 +40,7 @@ struct Card {
     game_changer: bool,
 }
 
-enum Rarity {
+pub enum Rarity {
     Common,
     Mythic,
     Rare,
@@ -27,7 +48,7 @@ enum Rarity {
     Uncommon,
 }
 
-struct ColorCombination {
+pub struct ColorCombination {
     white: bool,
     blue: bool,
     red: bool,
@@ -36,12 +57,12 @@ struct ColorCombination {
     wtf: Option<NonOriginalColor>, //this is for cards like Avatar of Me
 }
 
-struct NonOriginalColor {
+pub struct NonOriginalColor {
     hex: [u8; 3],
     name: String,
 }
 
-struct NormalManaCost {
+pub struct NormalManaCost {
     any: usize,
     white: usize,
     blue: usize,
@@ -50,7 +71,7 @@ struct NormalManaCost {
     black: usize,
 }
 
-enum ManaCost {
+pub enum ManaCost {
     Normal(NormalManaCost),
     Complicated {
         normal_component: NormalManaCost,
@@ -60,7 +81,7 @@ enum ManaCost {
     },
 }
 
-struct ManaSymbol {
+pub struct ManaSymbol {
     phyrexian: bool,
     color: ColorCombination,
     uncolored_number: Option<NonZero<usize>>,
