@@ -16,7 +16,7 @@
   
 5. As a **competitive player**, I want to make certain decks "exclusive"
   - So that I can easily see which cards are available for future decks.
-  - [AC]: A deck can be toggled to exclusive. Afterwards, its cards aren't available for other decks
+  - [AC]: A deck can be toggled to exclusive. Afterwards, its cards aren't available for other decks. The operation fails if any cards are shared in other decks.
   
 6. As a **noncompetitive player**, I want to make certain decks "non-exclusive"
   - So that I can easily share generic cards across decks.
@@ -36,7 +36,7 @@
   
 10. As a **nerdy Magic player** I want my collection to be stored on my own computer
   - So that I have data ownership
-  - [AC]: Collection can be stored in files on user's computer
+  - [AC]: Collection is stored in files on user's computer
   
 11. As a **non-nerdy Magic player**, I want my collection to be able to sync across devices
   - So that I can access my collection on-the-go
