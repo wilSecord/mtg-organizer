@@ -54,12 +54,6 @@ pub struct ColorCombination {
     red: bool,
     green: bool,
     black: bool,
-    wtf: Option<NonOriginalColor>, //this is for cards like Avatar of Me
-}
-
-pub struct NonOriginalColor {
-    hex: [u8; 3],
-    name: String,
 }
 
 pub struct NormalManaCost {
@@ -69,13 +63,13 @@ pub struct NormalManaCost {
     red: usize,
     green: usize,
     black: usize,
+    colorless: usize,
 }
 
 pub enum ManaCost {
     Normal(NormalManaCost),
     Complicated {
         normal_component: NormalManaCost,
-        colorless: usize,
         variables: Vec<char>,
         symbol_level_info: Vec<ManaSymbol>,
     },
@@ -84,5 +78,5 @@ pub enum ManaCost {
 pub struct ManaSymbol {
     phyrexian: bool,
     color: ColorCombination,
-    uncolored_number: Option<NonZero<usize>>,
+    is_split_generic: bool,
 }
