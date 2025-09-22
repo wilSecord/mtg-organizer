@@ -27,7 +27,7 @@ pub struct Card {
     mana_value: f64,
     color: ColorCombination,
     color_id: ColorCombination,
-    super_types: Vec<String>,
+    super_types: Vec<Supertype>,
     types: Vec<String>,
     rarity: Rarity,
     oracle_text: String,
@@ -38,6 +38,16 @@ pub struct Card {
     defense: usize,
     sets_released: Vec<String>,
     game_changer: bool,
+}
+
+pub enum Supertype {
+    Basic,
+    Legendary,
+    Ongoing,
+    Snow,
+    World,
+    Elite,
+    Host
 }
 
 pub enum Rarity {
@@ -54,6 +64,7 @@ pub struct ColorCombination {
     red: bool,
     green: bool,
     black: bool,
+    colorless: bool,
 }
 
 pub struct NormalManaCost {
@@ -68,15 +79,27 @@ pub struct NormalManaCost {
 
 pub enum ManaCost {
     Normal(NormalManaCost),
-    Complicated {
-        normal_component: NormalManaCost,
-        variables: Vec<char>,
-        symbol_level_info: Vec<ManaSymbol>,
-    },
+    Complicated(NormalManaCost, ComplicatedManaCases),
+}
+
+pub enum ComplicatedManaCases {
+    OneSnowMana,
+    Variables(Vec<char>),
+    SymbolLevel(Vec<ManaSymbol>)
+}
+
+pub enum Color {
+    White,
+    Blue,
+    Red,
+    Green,
+    Black,
+    Colorless,
 }
 
 pub struct ManaSymbol {
     phyrexian: bool,
-    color: ColorCombination,
-    is_split_generic: bool,
+    split_two_generic: bool,    
+    color: Color,
+    split_color: Option<Color>,
 }
