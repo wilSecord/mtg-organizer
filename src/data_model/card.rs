@@ -22,22 +22,22 @@ pub struct PhysicalCard {
 }
 
 pub struct Card {
-    name: String,
-    mana_cost: ManaCost,
-    mana_value: f64,
-    color: ColorCombination,
-    color_id: ColorCombination,
-    super_types: Vec<Supertype>,
-    types: Vec<String>,
-    rarity: Rarity,
-    oracle_text: String,
-    power: usize,
-    toughness: usize,
-    subtypes: Vec<String>,
-    loyalty: usize,
-    defense: usize,
-    sets_released: Vec<String>,
-    game_changer: bool,
+    pub name: String,
+    pub mana_cost: ManaCost,
+    pub mana_value: f64,
+    pub color: ColorCombination,
+    pub color_id: ColorCombination,
+    pub super_types: Vec<Supertype>,
+    pub types: Vec<String>,
+    pub subtypes: Vec<String>,
+    pub rarity: Rarity,
+    pub oracle_text: String,
+    pub power: usize,
+    pub toughness: usize,
+    pub loyalty: usize,
+    pub defense: usize,
+    pub sets_released: Vec<String>,
+    pub game_changer: bool,
 }
 
 pub enum Supertype {
@@ -52,23 +52,23 @@ pub enum Supertype {
 
 pub enum Rarity {
     Common,
-    Mythic,
-    Rare,
-    Special,
     Uncommon,
+    Rare,
+    Mythic,
+    Special,
 }
 
 pub struct ColorCombination {
     white: bool,
     blue: bool,
+    black: bool,
     red: bool,
     green: bool,
-    black: bool,
     colorless: bool,
 }
 
 pub struct NormalManaCost {
-    any: usize,
+    generic: usize,
     white: usize,
     blue: usize,
     red: usize,

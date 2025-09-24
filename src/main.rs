@@ -1,5 +1,6 @@
 use std::io::{self, BufRead, BufReader};
-use std::fs::File;
+use std::fs::{File, read_to_string};
+use serde_json;
 use nucleo_matcher::pattern::{Normalization, CaseMatching, Pattern};
 use nucleo_matcher::{Matcher, Config};
 use crossterm::event::{self, Event, KeyCode, KeyEventKind};
@@ -11,30 +12,12 @@ use ratatui::{
     DefaultTerminal, Frame,
 };
 
+
 mod data_model;
 mod dbs;
 
-fn main() -> io::Result<()> {
-    let mut term = ratatui::init();
-    let app_result = App::new().run(&mut term);
-    ratatui::restore();
-    app_result
-}
+use data_model::card;
 
-// fn main() -> io::Result<()> {
-//     let file_path = "cards.txt"; 
-// 
-//     let file = File::open(file_path).expect("File not found.");
-//     let buf = BufReader::new(file);
-//     let contents: Vec<String> = buf.lines().map(|l| l.expect("Could not parse")).collect();
-// 
-//     let mut matcher = Matcher::new(Config::DEFAULT);
-// 
-//     let matches = Pattern::parse("Angel", CaseMatching::Ignore, Normalization::Smart).match_list(contents, &mut matcher);
-//     println!("{:?}", matches);
-// 
-//     Ok(())
-// }
 
 enum InputMode {
     Normal,
@@ -179,3 +162,74 @@ impl App {
         Ok(())
     }
 }
+
+fn parse_card(card: serde_json::Value) {
+    let card_out = card::Card{
+        // I think these fields are private??? Is this on purpose?
+        name: card["name"].to_string(),
+        // mana_cost:
+        mana_value: card["mana_value"].as_f64().expect("Bad MV"),
+        color: card::ColorCombination {
+            white: card["color"].as_str().expect("Bad Color Combo").chars().any(|x| x == 'W'),
+            blue: card["color"].chars().any(|x| x == 'U'),
+            black: card["color"].chars().any(|x| x == 'B'),
+            red: card["color"].chars().any(|x| x == 'R'),
+            green: card["color"].chars().any(|x| x == 'G'),
+            colorless: card["color"].chars().any(|x| x == 'C'),
+        },
+        // color_id:
+        // super_types:
+        // types:
+        // subtypes: 
+        rarity: match card["rarity"].as_str().expect("Bad Rarity") {
+            "common" => card::Rarity::Common,
+            "uncommon" => card::Rarity::Uncommon,
+            "rare" => card::Rarity::Rare,
+            "mythic" => card::Rarity::Mythic,
+            "special" => card::Rarity::Special,
+        },
+        oracle_text: card["oracle_text"].to_string(),
+        power: card["power"].as_u64().expect("Bad Power") as usize,
+        toughness: card["toughness"].as_u64().expect("Bad Toughness") as usize,
+        // loyalty:
+        // defense:
+        // sets_released: 
+        // game_changer:
+
+    };
+    // for (key, value) in card_obj {
+
+    // }
+    
+}
+
+fn main() -> io::Result<()> {
+    let cards = read_to_string("../temp/data/cards.json").expect("Bad data").to_string();
+    let json_cards: serde_json::Value = serde_json::from_str(&cards).expect("Not well formatted");
+    let card = json_cards[0].clone();
+    parse_card(card);
+    
+    Ok(())
+}
+
+// fn main() -> io::Result<()> {
+//     let mut term = ratatui::init();
+//     let app_result = App::new().run(&mut term);
+//     ratatui::restore();
+//     app_result
+// }
+
+// fn main() -> io::Result<()> {
+//     let file_path = "cards.txt"; 
+// 
+//     let file = File::open(file_path).expect("File not found.");
+//     let buf = BufReader::new(file);
+//     let contents: Vec<String> = buf.lines().map(|l| l.expect("Could not parse")).collect();
+// 
+//     let mut matcher = Matcher::new(Config::DEFAULT);
+// 
+//     let matches = Pattern::parse("Angel", CaseMatching::Ignore, Normalization::Smart).match_list(contents, &mut matcher);
+//     println!("{:?}", matches);
+// 
+//     Ok(())
+// }
