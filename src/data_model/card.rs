@@ -6,10 +6,11 @@ use crate::data_model::oddities::{Stringish, StringishUsize};
 /// Reference to a specific card, can be as specific as needed or vague to be only set + collector number.
 /// Something will be made where code can exchange this for a full `Card`
 ///
+#[derive(Debug, Clone)]
 pub struct CardRef {
-    set: String,
-    collector_number: StringishUsize,
-    printing: Option<NonZero<usize>>,
+    pub set: String,
+    pub collector_number: StringishUsize,
+    pub printing: Option<NonZero<usize>>,
 }
 
 ///
@@ -17,8 +18,8 @@ pub struct CardRef {
 /// implemented differently (i.e. many `PhysicalCards` or one `PhysicalCard` with `duplicates`)
 /// depending on how the user choses to arrange their collection.
 pub struct PhysicalCard {
-    card: CardRef,
-    duplicates: usize,
+    pub card: CardRef,
+    pub duplicates: usize,
 }
 
 pub struct Card {
@@ -59,22 +60,22 @@ pub enum Rarity {
 }
 
 pub struct ColorCombination {
-    white: bool,
-    blue: bool,
-    black: bool,
-    red: bool,
-    green: bool,
-    colorless: bool,
+    pub white: bool,
+    pub blue: bool,
+    pub black: bool,
+    pub red: bool,
+    pub green: bool,
+    pub colorless: bool,
 }
 
 pub struct NormalManaCost {
-    generic: usize,
-    white: usize,
-    blue: usize,
-    red: usize,
-    green: usize,
-    black: usize,
-    colorless: usize,
+    pub generic: usize,
+    pub white: usize,
+    pub blue: usize,
+    pub red: usize,
+    pub green: usize,
+    pub black: usize,
+    pub colorless: usize,
 }
 
 pub enum ManaCost {
@@ -98,8 +99,8 @@ pub enum Color {
 }
 
 pub struct ManaSymbol {
-    phyrexian: bool,
-    split_two_generic: bool,    
-    color: Color,
-    split_color: Option<Color>,
+    pub phyrexian: bool,
+    pub split_two_generic: bool,    
+    pub color: Color,
+    pub split_color: Option<Color>,
 }

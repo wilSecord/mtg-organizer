@@ -58,9 +58,18 @@ impl<T: FromStr + DeserializeFromMinimal> DeserializeFromMinimal for Stringish<T
 ///
 /// A string that is normally a number, but can be something else.
 /// This is a workaround for Rust's limits on specialization
+#[derive(Debug, Clone)]
 pub enum StringishUsize {
     Number(usize),
     String(String),
+}
+impl StringishUsize {
+    pub fn is_usize(&self) -> bool {
+        match self {
+            StringishUsize::Number(_) => true,
+            StringishUsize::String(_) => false,
+        }
+    }
 }
 
 impl SerializeMinimal for StringishUsize {
