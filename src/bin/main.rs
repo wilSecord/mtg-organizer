@@ -12,13 +12,7 @@ use ratatui::{
     DefaultTerminal, Frame,
 };
 
-const APPNAME_DIRECTORY: &'static str = "mtg-organizer";
-
-
-mod data_model;
-mod dbs;
-
-use data_model::card;
+use project::data_model::card;
 
 
 enum InputMode {
@@ -182,46 +176,6 @@ fn parse_mana_cost(cost: String) {
     }
     
 }
-
-// fn parse_card(card: serde_json::Value) {
-//     let card_out = card::Card{
-//         // I think these fields are private??? Is this on purpose?
-//         name: card["name"].to_string(),
-//         // mana_cost
-//         mana_value: card["mana_value"].as_f64().expect("Bad MV"),
-//         color: card::ColorCombination {
-//             white: card["color"].as_str().expect("Bad Color Combo").chars().any(|x| x == 'W'),
-//             blue: card["color"].as_str().expect("Bad Color Combo").chars().any(|x| x == 'U'),
-//             black: card["color"].as_str().expect("Bad Color Combo").chars().any(|x| x == 'B'),
-//             red: card["color"].as_str().expect("Bad Color Combo").chars().any(|x| x == 'R'),
-//             green: card["color"].as_str().expect("Bad Color Combo").chars().any(|x| x == 'G'),
-//             colorless: card["color"].as_str().expect("Bad Color Combo").chars().any(|x| x == 'C'),
-//         },
-//         // color_id:
-//         // super_types:
-//         // types:
-//         // subtypes: 
-//         rarity: match card["rarity"].as_str().expect("Bad Rarity") {
-//             "common" => card::Rarity::Common,
-//             "uncommon" => card::Rarity::Uncommon,
-//             "rare" => card::Rarity::Rare,
-//             "mythic" => card::Rarity::Mythic,
-//             "special" => card::Rarity::Special,
-//         },
-//         oracle_text: card["oracle_text"].to_string(),
-//         power: card["power"].as_u64().expect("Bad Power") as usize,
-//         toughness: card["toughness"].as_u64().expect("Bad Toughness") as usize,
-//         // loyalty:
-//         // defense:
-//         // sets_released: 
-//         // game_changer:
-// 
-//     };
-//     // for (key, value) in card_obj {
-// 
-//     // }
-//     
-// }
 
 fn main() -> io::Result<()> {
     // let cards = read_to_string("../temp/data/cards.json").expect("Bad data").to_string();

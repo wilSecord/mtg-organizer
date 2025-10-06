@@ -17,11 +17,13 @@ pub struct CardRef {
 /// One physical card. Users may have more than one `PhysicalCard` with the same `CardRef` in their collection; this might be
 /// implemented differently (i.e. many `PhysicalCards` or one `PhysicalCard` with `duplicates`)
 /// depending on how the user choses to arrange their collection.
+#[derive(Debug, Clone)]
 pub struct PhysicalCard {
     pub card: CardRef,
     pub duplicates: usize,
 }
 
+#[derive(Debug, Clone)]
 pub struct Card {
     pub name: String,
     pub mana_cost: ManaCost,
@@ -41,6 +43,7 @@ pub struct Card {
     pub game_changer: bool,
 }
 
+#[derive(Debug, Clone, Copy)]
 pub enum Supertype {
     Basic,
     Legendary,
@@ -48,9 +51,10 @@ pub enum Supertype {
     Snow,
     World,
     Elite,
-    Host
+    Host,
 }
 
+#[derive(Debug, Clone)]
 pub enum Rarity {
     Common,
     Uncommon,
@@ -59,6 +63,7 @@ pub enum Rarity {
     Special,
 }
 
+#[derive(Debug, Clone, Default)]
 pub struct ColorCombination {
     pub white: bool,
     pub blue: bool,
@@ -68,6 +73,7 @@ pub struct ColorCombination {
     pub colorless: bool,
 }
 
+#[derive(Debug, Clone, Copy)]
 pub enum NormalManaSymbol {
     White,
     Blue,
@@ -78,21 +84,10 @@ pub enum NormalManaSymbol {
     Colorless,
 }
 
-pub struct NormalManaCost {
-    pub symbols: Vec<NormalManaSymbol>,
-    pub generic: usize
-}
+#[derive(Debug, Clone)]
+pub struct ManaCost (pub Vec<ManaSymbol>);
 
-pub enum ManaCost {
-    Normal(NormalManaCost),
-    Complicated(NormalManaCost, ComplicatedManaCases),
-}
-
-pub enum ComplicatedManaCases {
-    Variables(Vec<char>),
-    SymbolLevel(Vec<ManaSymbol>)
-}
-
+#[derive(Debug, Clone)]
 pub enum Color {
     White,
     Blue,
@@ -102,9 +97,21 @@ pub enum Color {
     Colorless,
 }
 
-pub struct ManaSymbol {
-    pub phyrexian: bool,
-    pub split_two_generic: bool,    
-    pub color: Color,
-    pub split_color: Option<Color>,
+#[derive(Debug, Clone, Copy)]
+pub enum ManaVariable {
+    X,
+    Y,
+    Z,
+}
+#[derive(Debug, Clone)]
+pub enum ManaSymbol {
+    Variable(ManaVariable),
+    GenericNumber(usize),
+    Snow,
+    ConventionalColored {
+        phyrexian: bool,
+        split_two_generic: bool,
+        color: Color,
+        split_color: Option<Color>,
+    },
 }

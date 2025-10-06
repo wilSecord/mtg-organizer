@@ -11,7 +11,3 @@ ratatui = "0.29.0"
 minimal_storage = { git = "https://github.com/chlohal/tiny-maps.git" }
 tree = { git = "https://github.com/chlohal/tiny-maps.git" }
 serde_json = "1.0.145"
-
-[[bin]]
-name = "build_card_db"
-path = "src/build_card_db.rs"

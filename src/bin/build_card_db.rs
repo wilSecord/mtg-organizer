@@ -1,202 +1,62 @@
 use std::io::{self, BufRead, BufReader};
 use std::fs::{File, read_to_string};
+use project::data_model::card::{self, Card, Color, ColorCombination, ManaCost, ManaSymbol, Supertype};
 use serde_json;
-use nucleo_matcher::pattern::{Normalization, CaseMatching, Pattern};
-use nucleo_matcher::{Matcher, Config};
-use crossterm::event::{self, Event, KeyCode, KeyEventKind};
-use ratatui::{
-    layout::{Constraint, Direction, Layout},
-    style::{Color, Style},
-    text::{Line, Text},
-    widgets::{Block, Paragraph},
-    DefaultTerminal, Frame,
-};
 
 const APPNAME_DIRECTORY: &'static str = "mtg-organizer";
 
-
-mod data_model;
-mod dbs;
-
-use data_model::card;
-
-
-enum InputMode {
-    Normal,
-    Editing,
-}
-
-// Setup App struct
-struct App {
-    search: String,
-    input_mode: InputMode,
-    exit: bool,
-    contents: Vec<String>,
-    results: Vec<String>,
-}
-
-// Implement App
-impl App {    
-    // new function initializing most things
-    const fn new() -> Self {
-        Self {
-            search: String::new(),
-            input_mode: InputMode::Normal,
-            exit: false,
-            contents: Vec::new(),
-            results: Vec::new(),
+fn parse_color_combination(combo: &str) -> ColorCombination {
+    let mut cc = ColorCombination::default();
+    for chs in combo.chars() {
+        match chs {
+            'W' => cc.white = true,
+            'U' => cc.blue = true,
+            'B' => cc.black = true,
+            'R' => cc.red = true,
+            'G' => cc.green = true,
+            'C' => cc.colorless = true,
+            _ => {}
         }
     }
 
-    pub fn run(&mut self, term: &mut DefaultTerminal) -> io::Result<()> {
-        //TODO: Make the matcher object and contents able to be read by get_results()
-
-        // TEMP
-        // TEMP
-        let file_path = "cards.txt"; 
-    
-        let file = File::open(file_path).expect("File not found.");
-        let buf = BufReader::new(file);
-        self.contents = buf.lines().map(|l| l.expect("Could not parse")).collect();
-        // TEMP
-        // TEMP
-
-        let mut matcher = Matcher::new(Config::DEFAULT);
-
-        // As long as self.exit == true, run the gameloop stuff (drawing, handling inputs)
-        while !self.exit {
-            term.draw(|frame| self.draw(frame))?; // Drawing
-            self.handle_events(&mut matcher)?;    // Handling inputs
-        }
-        Ok(()) // ok :+1:
-    }
-
-    fn draw(&self, frame: &mut Frame) {
-        // Full layout 
-        let total = Layout::default()
-            .direction(Direction::Horizontal)
-            .constraints([
-                Constraint::Percentage(75),
-                Constraint::Percentage(25),
-            ]).split(frame.area());
-        
-        // Setting up the left side of the screen
-        let left = Layout::default()
-            .direction(Direction::Vertical) // Multiple tiles on top of each other
-            .constraints([
-                Constraint::Length(1), // Help line
-                Constraint::Length(3), // Input box
-                Constraint::Min(1),    // Results box
-            ])
-            .split(total[0]);
-
-        let help_area = left[0];      // Area for keybinds/help text
-        let input_area = left[1];     // Area for input box                 || TODO: Refactor to searchbar
-        let body_area = left[2];      // Area for results box               || TODO: Rename this
-        let decklist_area = total[1]; // Area for decklist (rename this?)
-
-        // Outline the searchbar/input box
-        let search = Paragraph::new(self.search.as_str())
-            // Change style based on if the person is typing in it or not
-            .style(match self.input_mode {
-                InputMode::Normal => Style::default(),
-                InputMode::Editing => Style::default().fg(Color::Yellow),
-            })
-            .block(Block::bordered().title("Input")); // Set border as box
-        
-        // Help text area
-        // TODO: Change this lol
-        let (msg, style) = match self.input_mode {
-            InputMode::Normal => ("Normal", Style::default()),
-            InputMode::Editing => ("Editing", Style::default()),
-        };
-        let text = Text::from(Line::from(msg)).patch_style(style);
-        let help_msg = Paragraph::new(text);
-        
-        // Results area
-        let body = Paragraph::new("test").block(Block::bordered().title("Results"));
-
-        // Render stuff
-        frame.render_widget(help_msg, help_area);
-        frame.render_widget(search, input_area);
-        frame.render_widget(body, body_area);
-        frame.render_widget(Paragraph::new("thing").block(Block::bordered().title("Decklist")), decklist_area);
-
-    }
-
-    fn get_results(& mut self, matcher: &mut Matcher) {
-        self.results = Pattern::parse(&self.search, CaseMatching::Ignore, Normalization::Smart).match_list(&self.contents, matcher).into_iter().map(|x| x.0.to_owned()).collect();
-        //TODO Update Results widget
-    }
-
-    fn delete_char(& mut self, matcher: &mut Matcher) {
-        self.search.pop();
-        self.get_results(matcher);
-    }
-
-    fn add_char(& mut self, c: char, matcher: &mut Matcher) {
-        self.search.push(c);
-        self.get_results(matcher);
-    }
-
-    fn handle_events(&mut self, matcher: &mut Matcher) -> io::Result<()> {
-        if let Event::Key(key) = event::read()? {
-            match self.input_mode {
-                InputMode::Normal => match key.code {
-                    KeyCode::Char('q') => {
-                        self.exit = true;
-                    }
-                    KeyCode::Char('f') => {
-                        self.input_mode = InputMode::Editing;
-                    }
-                    _ => {}
-                }
-                InputMode::Editing if key.kind == KeyEventKind::Press => match key.code {
-                    KeyCode::Enter => self.input_mode = InputMode::Normal,
-                    KeyCode::Backspace => self.delete_char(matcher),
-                    KeyCode::Char(c) => self.add_char(c, matcher),
-                    KeyCode::Esc => self.input_mode = InputMode::Normal,
-                    _ => {}
-                }
-                _ => {}
-            }
-        }
-        Ok(())
-    }
+    cc
 }
 
-fn parse_card(card: serde_json::Value) {
-    let card_out = card::Card{
-        // I think these fields are private??? Is this on purpose?
+fn parse_card(card: serde_json::Value) -> Card {
+    return Card{
         name: card["name"].to_string(),
-        // mana_cost:
+        mana_cost: parse_mana_cost(card["mana_cost"].as_str().expect("Mana cost should be a string")),
         mana_value: card["mana_value"].as_f64().expect("Bad MV"),
-        color: card::ColorCombination {
-            white: card["color"].as_str().expect("Bad Color Combo").chars().any(|x| x == 'W'),
-            blue: card["color"].chars().any(|x| x == 'U'),
-            black: card["color"].chars().any(|x| x == 'B'),
-            red: card["color"].chars().any(|x| x == 'R'),
-            green: card["color"].chars().any(|x| x == 'G'),
-            colorless: card["color"].chars().any(|x| x == 'C'),
-        },
-        // color_id:
-        // super_types:
-        // types:
-        // subtypes: 
+        color: parse_color_combination(card["color"].as_str().expect("Bad Color Combo")),
+        color_id: parse_color_combination(card["color_id"].as_str().expect("Bad Color Combo")),
+        super_types: card["super_types"].as_str().expect("super_types should be a string").split("/").map(|x| match x {
+            "Basic" => Supertype::Basic,
+            "Legendary" => Supertype::Legendary,
+            "Elite" => Supertype::Elite,
+            "Ongoing" => Supertype::Ongoing,
+            "Host" => Supertype::Host,
+            "World" => Supertype::World,
+            "Snow" => Supertype::Snow,
+            _ => panic!("Unknown supertype {x}")
+        }).collect(),
         rarity: match card["rarity"].as_str().expect("Bad Rarity") {
             "common" => card::Rarity::Common,
             "uncommon" => card::Rarity::Uncommon,
             "rare" => card::Rarity::Rare,
             "mythic" => card::Rarity::Mythic,
             "special" => card::Rarity::Special,
+            other => panic!("Unexpected rarity value {other}")
         },
         oracle_text: card["oracle_text"].to_string(),
         power: card["power"].as_u64().expect("Bad Power") as usize,
         toughness: card["toughness"].as_u64().expect("Bad Toughness") as usize,
-        // loyalty:
-        // defense:
-        // sets_released: 
-        // game_changer:
+        types: card["types"].as_str().expect("Bad types").split(", ").map(String::from).collect(),
+        subtypes: card["subtypes"].as_str().expect("Bad types").split(", ").map(String::from).collect(),
+        loyalty: card["loyalty"].as_u64().expect("Bad loyalty") as usize,
+        defense: card["defense"].as_u64().expect("Bad defense") as usize,
+        sets_released: card["sets_released"].as_str().expect("Bad types").split(", ").map(String::from).collect(),
+        game_changer: card["game_changer"].as_str().expect("Bad game_changer") == "true",
+        
 
     };
     // for (key, value) in card_obj {
@@ -205,33 +65,112 @@ fn parse_card(card: serde_json::Value) {
     
 }
 
+fn scan_mana_symbol<'a>(buf: &mut &'a str) -> &'a str {
+    for (i, ch) in buf.char_indices() {
+        //opening bracket will already be handled by parse_mana_cost
+        if ch == '}' {
+            let (src, new_buf) = buf.split_at(i);
+            *buf = new_buf;
+            return src;
+        }
+    }
+    return "";
+}
+
+fn parse_mana_symbol(src: &str) -> ManaSymbol {
+    //rules text: 107.4. The mana symbols are {W}, {U}, {B}, {R}, {G}, and {C}; 
+    //              the numerical symbols {0}, {1}, {2}, {3}, {4}, and so on; the 
+    //              variable symbol {X}; the hybrid symbols {W/U}, {W/B}, {U/B}, {U/R}, 
+    //              {B/R}, {B/G}, {R/G}, {R/W}, {G/W}, and {G/U}; the monocolored hybrid 
+    //              symbols {2/W}, {2/U}, {2/B}, {2/R}, {2/G}, {C/W}, {C/U}, {C/B}, {C/R}, 
+    //              and {C/G}; the Phyrexian mana symbols {W/P}, {U/P}, {B/P}, {R/P}, and {G/P}; 
+    //              the hybrid Phyrexian symbols {W/U/P}, {W/B/P}, {U/B/P}, {U/R/P}, {B/R/P}, {B/G/P}, 
+    //              {R/G/P}, {R/W/P}, {G/W/P}, and {G/U/P}; and the snow mana symbol {S}.
+
+    if src.chars().all(|x| x.is_ascii_digit()) {
+        return ManaSymbol::GenericNumber(src.parse().unwrap());
+    }
+
+    match src {
+        "S" => return ManaSymbol::Snow,
+        "X" => return ManaSymbol::Variable(card::ManaVariable::X),
+        "Y" => return ManaSymbol::Variable(card::ManaVariable::Y),
+        "Z" => return ManaSymbol::Variable(card::ManaVariable::Z),
+        _ => {}
+    }
+
+    //having completed that, it's definitely going to be a conventional coloured 
+    // mana symbol of some kind.
+
+    let mut split_two_generic = false;
+    let mut phyrexian = false;
+
+    let mut colors = Vec::with_capacity(2);
+
+    for spec in src.split("/") {
+        match spec {
+            "P" => phyrexian = true,
+            "2" => split_two_generic = true,
+            c => colors.push(parse_color(c.chars().next().expect("Empty colour name"))),
+        }
+    }
+
+    assert!(colors.len() <= 2);
+
+    if colors.len() == 2 {
+        let split_color = colors.pop();
+        let color = colors.pop().unwrap();
+        return ManaSymbol::ConventionalColored { phyrexian, split_two_generic, color, split_color };
+    } else if colors.len() == 1 {
+        let split_color = None;
+        let color = colors.pop().unwrap();
+        return ManaSymbol::ConventionalColored { phyrexian, split_two_generic, color, split_color };
+    } else {
+        panic!("Bad mana symbol {{{src}}}")
+    }
+}
+
+fn parse_color(color: char) -> Color {
+    match color {
+        'W' => Color::White,
+        'U' => Color::Blue,
+        'B' => Color::Black,
+        'R' => Color::Red,
+        'G' => Color::Green,
+        'C' => Color::Colorless,
+        _ => panic!("{color} is not a valid color!")
+    }
+}
+
+fn parse_mana_cost(mut cost: &str) -> ManaCost {
+    let mut mana: Vec<ManaSymbol> = vec![];
+
+    //Since parse_mana_symbol modifies the string, 
+    //this makes the iterator anew each time.
+    //It won't be super expensive because char_indices doesn't allocate,
+    // and even if it was, it wouldn't really matter because this is a build step.
+    let mut chs = cost.char_indices();
+    while let Some((i, ch)) = chs.next() {
+        if ch == '{' {
+            cost = &cost[(i + 1)..];
+            let mana_symbol_src = scan_mana_symbol(&mut cost);
+            mana.push(parse_mana_symbol(mana_symbol_src));
+            chs = cost.char_indices();
+        }
+    }
+
+    ManaCost(mana)
+    
+}
+
+//NOTE: In general, this module panics instead of sensibly handling errors
 fn main() -> io::Result<()> {
-    let cards = read_to_string("../temp/data/cards.json").expect("Bad data").to_string();
-    let json_cards: serde_json::Value = serde_json::from_str(&cards).expect("Not well formatted");
-    let card = json_cards[0].clone();
-    parse_card(card);
+    let cards = std::env::args();
+    //let cards = read_to_string("../temp/data/cards.json").expect("Bad data").to_string();
+    //let json_cards: serde_json::Value = serde_json::from_str(&cards).expect("Not well formatted");
+    // let card = json_cards[0].clone();
+    // parse_card(card);
+    dbg!(parse_mana_cost("{W}{W}{B}{3}"));
     
     Ok(())
 }
-
-// fn main() -> io::Result<()> {
-//     let mut term = ratatui::init();
-//     let app_result = App::new().run(&mut term);
-//     ratatui::restore();
-//     app_result
-// }
-
-// fn main() -> io::Result<()> {
-//     let file_path = "cards.txt"; 
-// 
-//     let file = File::open(file_path).expect("File not found.");
-//     let buf = BufReader::new(file);
-//     let contents: Vec<String> = buf.lines().map(|l| l.expect("Could not parse")).collect();
-// 
-//     let mut matcher = Matcher::new(Config::DEFAULT);
-// 
-//     let matches = Pattern::parse("Angel", CaseMatching::Ignore, Normalization::Smart).match_list(contents, &mut matcher);
-//     println!("{:?}", matches);
-// 
-//     Ok(())
-// }
