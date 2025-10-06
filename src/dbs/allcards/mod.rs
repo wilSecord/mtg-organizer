@@ -1,13 +1,14 @@
-use std::path::Path;
+use std::{fs::File, path::Path};
 
-use tree::tree_traits::MultidimensionalKey;
+use minimal_storage::multitype_paged_storage::MultitypePagedStorage;
+use tree::{sparse::structure::StoredTree, tree_traits::MultidimensionalKey};
 
 use crate::data_model::card::{Card, CardRef};
 
 mod cardref_key;
 
 pub struct AllCardsDb {
-    
+    inner: StoredTree<1, 8000, u128, Card>
 }
 
 

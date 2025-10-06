@@ -165,51 +165,70 @@ impl App {
     }
 }
 
-fn parse_card(card: serde_json::Value) {
-    let card_out = card::Card{
-        // I think these fields are private??? Is this on purpose?
-        name: card["name"].to_string(),
-        // mana_cost:
-        mana_value: card["mana_value"].as_f64().expect("Bad MV"),
-        color: card::ColorCombination {
-            white: card["color"].as_str().expect("Bad Color Combo").chars().any(|x| x == 'W'),
-            blue: card["color"].chars().any(|x| x == 'U'),
-            black: card["color"].chars().any(|x| x == 'B'),
-            red: card["color"].chars().any(|x| x == 'R'),
-            green: card["color"].chars().any(|x| x == 'G'),
-            colorless: card["color"].chars().any(|x| x == 'C'),
-        },
-        // color_id:
-        // super_types:
-        // types:
-        // subtypes: 
-        rarity: match card["rarity"].as_str().expect("Bad Rarity") {
-            "common" => card::Rarity::Common,
-            "uncommon" => card::Rarity::Uncommon,
-            "rare" => card::Rarity::Rare,
-            "mythic" => card::Rarity::Mythic,
-            "special" => card::Rarity::Special,
-        },
-        oracle_text: card["oracle_text"].to_string(),
-        power: card["power"].as_u64().expect("Bad Power") as usize,
-        toughness: card["toughness"].as_u64().expect("Bad Toughness") as usize,
-        // loyalty:
-        // defense:
-        // sets_released: 
-        // game_changer:
-
-    };
-    // for (key, value) in card_obj {
-
-    // }
+fn parse_mana_cost(cost: String) {
+    let new_cost: Vec<char> = cost.as_str().chars().filter(|x| *x != '}').filter(|x| *x != '{').collect();
+    let first = new_cost[0];
+    let mut mana: Vec<card::NormalManaSymbol> = vec![];
+    // println!("{:?}", new_cost);
+    match first {
+        'W' => mana.push(card::NormalManaSymbol::White),
+        'U' => mana.push(card::NormalManaSymbol::Blue),
+        'B' => mana.push(card::NormalManaSymbol::Black),
+        'R' => mana.push(card::NormalManaSymbol::Red),
+        'G' => mana.push(card::NormalManaSymbol::Green),
+        'C' => mana.push(card::NormalManaSymbol::Colorless),
+        'S' => mana.push(card::NormalManaSymbol::Snow),
+        _ => {}
+    }
     
 }
 
+// fn parse_card(card: serde_json::Value) {
+//     let card_out = card::Card{
+//         // I think these fields are private??? Is this on purpose?
+//         name: card["name"].to_string(),
+//         // mana_cost
+//         mana_value: card["mana_value"].as_f64().expect("Bad MV"),
+//         color: card::ColorCombination {
+//             white: card["color"].as_str().expect("Bad Color Combo").chars().any(|x| x == 'W'),
+//             blue: card["color"].as_str().expect("Bad Color Combo").chars().any(|x| x == 'U'),
+//             black: card["color"].as_str().expect("Bad Color Combo").chars().any(|x| x == 'B'),
+//             red: card["color"].as_str().expect("Bad Color Combo").chars().any(|x| x == 'R'),
+//             green: card["color"].as_str().expect("Bad Color Combo").chars().any(|x| x == 'G'),
+//             colorless: card["color"].as_str().expect("Bad Color Combo").chars().any(|x| x == 'C'),
+//         },
+//         // color_id:
+//         // super_types:
+//         // types:
+//         // subtypes: 
+//         rarity: match card["rarity"].as_str().expect("Bad Rarity") {
+//             "common" => card::Rarity::Common,
+//             "uncommon" => card::Rarity::Uncommon,
+//             "rare" => card::Rarity::Rare,
+//             "mythic" => card::Rarity::Mythic,
+//             "special" => card::Rarity::Special,
+//         },
+//         oracle_text: card["oracle_text"].to_string(),
+//         power: card["power"].as_u64().expect("Bad Power") as usize,
+//         toughness: card["toughness"].as_u64().expect("Bad Toughness") as usize,
+//         // loyalty:
+//         // defense:
+//         // sets_released: 
+//         // game_changer:
+// 
+//     };
+//     // for (key, value) in card_obj {
+// 
+//     // }
+//     
+// }
+
 fn main() -> io::Result<()> {
-    let cards = read_to_string("../temp/data/cards.json").expect("Bad data").to_string();
-    let json_cards: serde_json::Value = serde_json::from_str(&cards).expect("Not well formatted");
-    let card = json_cards[0].clone();
-    parse_card(card);
+    // let cards = read_to_string("../temp/data/cards.json").expect("Bad data").to_string();
+    // let json_cards: serde_json::Value = serde_json::from_str(&cards).expect("Not well formatted");
+    // let card = json_cards[0].clone();
+    // parse_card(card);
+    parse_mana_cost("{W}{W}{B}{3}".to_string());
     
     Ok(())
 }

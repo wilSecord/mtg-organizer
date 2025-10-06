@@ -68,14 +68,19 @@ pub struct ColorCombination {
     pub colorless: bool,
 }
 
+pub enum NormalManaSymbol {
+    White,
+    Blue,
+    Red,
+    Green,
+    Black,
+    Snow, // Check with chloe make sure this is okay
+    Colorless,
+}
+
 pub struct NormalManaCost {
-    pub generic: usize,
-    pub white: usize,
-    pub blue: usize,
-    pub red: usize,
-    pub green: usize,
-    pub black: usize,
-    pub colorless: usize,
+    pub symbols: Vec<NormalManaSymbol>,
+    pub generic: usize
 }
 
 pub enum ManaCost {
@@ -84,7 +89,6 @@ pub enum ManaCost {
 }
 
 pub enum ComplicatedManaCases {
-    OneSnowMana,
     Variables(Vec<char>),
     SymbolLevel(Vec<ManaSymbol>)
 }
