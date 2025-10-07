@@ -20,7 +20,7 @@ pub fn main() {
     }
     //creates data/AllSetFiles/*.json
     if !fs::exists("data/AllSetFiles").unwrap() {
-        run_command("tar --xz -xf data/AllSetFiles.tar.xz");
+        run_command("tar --xz -C data/ -xf data/AllSetFiles.tar.xz");
     }
 
     let mut results = Vec::new();
