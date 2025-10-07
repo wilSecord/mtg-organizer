@@ -1,4 +1,7 @@
-use std::num::NonZero;
+use std::{
+    num::{IntErrorKind, NonZero, ParseIntError},
+    str::FromStr,
+};
 
 use crate::data_model::oddities::{Stringish, StringishUsize};
 
@@ -35,12 +38,44 @@ pub struct Card {
     pub subtypes: Vec<String>,
     pub rarity: Rarity,
     pub oracle_text: String,
-    pub power: usize,
-    pub toughness: usize,
-    pub loyalty: usize,
+    pub power: CardDynamicNumber,
+    pub toughness: CardDynamicNumber,
+    pub loyalty: CardDynamicNumber,
     pub defense: usize,
     pub sets_released: Vec<String>,
     pub game_changer: bool,
+}
+
+#[derive(Debug, Clone)]
+///
+/// Represents some non-negative integer on a MtG card which
+/// can be a set value or can be controlled by some
+/// manner of game state (e.g. Plague Rats)
+/// Even if the value is technically fixed, if it's infinite or
+/// negative then it will be treated as dynamic.
+pub enum CardDynamicNumber {
+    Set(usize),
+    Dynamic,
+}
+
+impl Default for CardDynamicNumber {
+    fn default() -> Self {
+        Self::Dynamic
+    }
+}
+
+impl FromStr for CardDynamicNumber {
+    type Err = <usize as FromStr>::Err;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "*" | "*+1" | "2+*" | "7-*" | "1+*" | "?" | "X" | "1d4+1" | "∞" | "-1" | "-0" | "1.5" | "3.5" | ".5" | "2.5" | "*²" => Ok(Self::Dynamic),
+            s => match s.parse() {
+                Ok(v) => Ok(Self::Set(v)),
+                Err(e) => Err(e),
+            },
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -85,7 +120,7 @@ pub enum NormalManaSymbol {
 }
 
 #[derive(Debug, Clone)]
-pub struct ManaCost (pub Vec<ManaSymbol>);
+pub struct ManaCost(pub Vec<ManaSymbol>);
 
 #[derive(Debug, Clone)]
 pub enum Color {
@@ -108,10 +143,14 @@ pub enum ManaSymbol {
     Variable(ManaVariable),
     GenericNumber(usize),
     Snow,
+    HalfWhite,
     ConventionalColored {
         phyrexian: bool,
         split_two_generic: bool,
         color: Color,
         split_color: Option<Color>,
     },
+    LandDrop,
+    Legendary,
+    OneMillionGenericMana,
 }

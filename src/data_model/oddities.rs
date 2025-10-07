@@ -1,6 +1,6 @@
 // Code to help generically deal with odd behaviours
 
-use std::str::FromStr;
+use std::{convert::Infallible, str::FromStr};
 
 use minimal_storage::{
     bit_sections::BitSection,
@@ -69,6 +69,29 @@ impl StringishUsize {
             StringishUsize::Number(_) => true,
             StringishUsize::String(_) => false,
         }
+    }
+}
+
+impl FromStr for StringishUsize {
+    type Err = Infallible;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.parse() {
+            Ok(n) => Ok(Self::Number(n)),
+            _ => Ok(Self::String(s.to_string()))
+        }
+    }
+}
+
+impl From<usize> for StringishUsize {
+    fn from(value: usize) -> Self {
+        Self::Number(value)
+    }
+}
+
+impl From<String> for StringishUsize {
+    fn from(value: String) -> Self {
+        Self::String(value)
     }
 }
 

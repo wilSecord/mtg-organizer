@@ -5,7 +5,7 @@ use tree::{sparse::structure::StoredTree, tree_traits::MultidimensionalKey};
 
 use crate::data_model::card::{Card, CardRef};
 
-mod cardref_key;
+pub mod cardref_key;
 
 pub struct AllCardsDb {
     inner: StoredTree<1, 8000, u128, Card>

@@ -7,8 +7,7 @@ use minimal_storage::{
 };
 
 use crate::data_model::card::{
-    Card, Color, ColorCombination, ManaCost, ManaSymbol, ManaVariable,
-    Rarity, Supertype,
+    Card, CardDynamicNumber, Color, ColorCombination, ManaCost, ManaSymbol, ManaVariable, Rarity, Supertype
 };
 
 impl MinimalSerdeFast for Card {
@@ -69,9 +68,9 @@ impl DeserializeFromMinimal for Card {
 
         let oracle_text = String::deserialize_minimal(from, Some(game_changer_byte))?;
 
-        let power = usize::deserialize_minimal(from, ())?;
-        let toughness = usize::deserialize_minimal(from, ())?;
-        let loyalty = usize::deserialize_minimal(from, ())?;
+        let power = CardDynamicNumber::deserialize_minimal(from, ())?;
+        let toughness = CardDynamicNumber::deserialize_minimal(from, ())?;
+        let loyalty = CardDynamicNumber::deserialize_minimal(from, ())?;
         let defense = usize::deserialize_minimal(from, ())?;
 
         Ok(Card {
@@ -115,7 +114,7 @@ impl SerializeMinimal for Card {
         //the rarity is less than 3 bits, so we can stuff it in before the name
         self.name
             .as_str()
-            .minimally_serialize(write_to, BitSection::from(rarity))?;
+            .minimally_serialize(write_to, BitSection::from(rarity << 5))?;
 
         //there should, AT LEAST, be quarter-mana. provided WotC doesn't do
         //something horrible
@@ -237,6 +236,35 @@ impl SerializeMinimal for ColorCombination {
     }
 }
 
+impl DeserializeFromMinimal for CardDynamicNumber {
+    type ExternalData<'d> = ();
+
+    fn deserialize_minimal<'a, 'd: 'a, R: std::io::Read>(
+        from: &'a mut R,
+        _: Self::ExternalData<'d>,
+    ) -> Result<Self, std::io::Error> {
+        match usize::deserialize_minimal(from, ())? {
+            0 => Ok(CardDynamicNumber::Dynamic),
+            n => Ok(CardDynamicNumber::Set(n.checked_sub(1).unwrap()))
+        }
+    }
+}
+
+impl SerializeMinimal for CardDynamicNumber {
+    type ExternalData<'s> = ();
+
+    fn minimally_serialize<'a, 's: 'a, W: std::io::Write>(
+        &'a self,
+        write_to: &mut W,
+        _: Self::ExternalData<'s>,
+    ) -> std::io::Result<()> {
+        match self {
+            CardDynamicNumber::Set(non_zero) => non_zero.checked_add(1).unwrap().minimally_serialize(write_to, ()),
+            CardDynamicNumber::Dynamic => 0usize.minimally_serialize(write_to, ()),
+        }
+    }
+}
+
 impl DeserializeFromMinimal for ColorCombination {
     type ExternalData<'d> = ();
 
@@ -314,11 +342,15 @@ fn mana_symbol_to_byte(ms: &ManaSymbol) -> u8 {
         ManaSymbol::Variable(ManaVariable::X) => 43,
         ManaSymbol::Variable(ManaVariable::Y) => 44,
         ManaSymbol::Variable(ManaVariable::Z) => 45,
+        ManaSymbol::LandDrop => 46,
+        ManaSymbol::Legendary => 47,
+        ManaSymbol::HalfWhite => 48,
+        ManaSymbol::OneMillionGenericMana => 49,
         ManaSymbol::GenericNumber(num) => {
             //if wotc makes a card that costs 20 generic mana i am
             //going to kick a can up the road.
             let lsb = (num + 42) as u8;
-            debug_assert!(lsb < 63);
+            debug_assert!(lsb < 63, "The maximum generic mana that can be stored is 20, but this is {num}");
             debug_assert!(lsb >= 42);
 
             0b1100_0000 | (*num as u8)
@@ -368,6 +400,10 @@ fn byte_to_mana_symbol(ms: u8) -> ManaSymbol {
         43 => return ManaSymbol::Variable(ManaVariable::X),
         44 => return ManaSymbol::Variable(ManaVariable::Y),
         45 => return ManaSymbol::Variable(ManaVariable::Z),
+        46 => return ManaSymbol::LandDrop,
+        47 => return ManaSymbol::Legendary,
+        48 => return ManaSymbol::HalfWhite,
+        49 => return ManaSymbol::OneMillionGenericMana,
         ms if ms >> 6 == 0b11 && ms & 0b0011_1111 >= 42 => {
             return ManaSymbol::GenericNumber((ms & 0b1_1111) as usize);
         }

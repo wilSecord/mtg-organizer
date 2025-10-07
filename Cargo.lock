@@ -56,7 +56,7 @@ dependencies = [
 [[package]]
 name = "btree_vec"
 version = "0.1.0"
-source = "git+https://github.com/chlohal/tiny-maps.git#95289749c9d2f6e52344b4687b5841570ad0a4fc"
+source = "git+https://github.com/chlohal/tiny-maps.git#621c93137341ca209e7779953723877e56225937"
 
 [[package]]
 name = "cassowary"
@@ -241,7 +241,7 @@ dependencies = [
 [[package]]
 name = "debug_logs"
 version = "0.1.0"
-source = "git+https://github.com/chlohal/tiny-maps.git#95289749c9d2f6e52344b4687b5841570ad0a4fc"
+source = "git+https://github.com/chlohal/tiny-maps.git#621c93137341ca209e7779953723877e56225937"
 
 [[package]]
 name = "derive_more"
@@ -302,7 +302,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.61.1",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -491,12 +491,12 @@ dependencies = [
 [[package]]
 name = "lru_cache"
 version = "0.1.0"
-source = "git+https://github.com/chlohal/tiny-maps.git#95289749c9d2f6e52344b4687b5841570ad0a4fc"
+source = "git+https://github.com/chlohal/tiny-maps.git#621c93137341ca209e7779953723877e56225937"
 
 [[package]]
 name = "lutmorton"
 version = "0.1.0"
-source = "git+https://github.com/chlohal/tiny-maps.git#95289749c9d2f6e52344b4687b5841570ad0a4fc"
+source = "git+https://github.com/chlohal/tiny-maps.git#621c93137341ca209e7779953723877e56225937"
 
 [[package]]
 name = "memchr"
@@ -507,7 +507,7 @@ checksum = "f52b00d39961fc5b2736ea853c9cc86238e165017a493d1d5c8eac6bdc4cc273"
 [[package]]
 name = "minimal_storage"
 version = "0.1.0"
-source = "git+https://github.com/chlohal/tiny-maps.git#95289749c9d2f6e52344b4687b5841570ad0a4fc"
+source = "git+https://github.com/chlohal/tiny-maps.git#621c93137341ca209e7779953723877e56225937"
 dependencies = [
  "btree_vec",
  "debug_logs",
@@ -706,7 +706,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys 0.11.0",
- "windows-sys 0.61.1",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -929,7 +929,7 @@ dependencies = [
 [[package]]
 name = "tree"
 version = "0.1.0"
-source = "git+https://github.com/chlohal/tiny-maps.git#95289749c9d2f6e52344b4687b5841570ad0a4fc"
+source = "git+https://github.com/chlohal/tiny-maps.git#621c93137341ca209e7779953723877e56225937"
 dependencies = [
  "btree_vec",
  "debug_logs",
@@ -1038,9 +1038,9 @@ checksum = "712e227841d057c1ee1cd2fb22fa7e5a5461ae8e48fa2ca79ec42cfc1931183f"
 
 [[package]]
 name = "windows-link"
-version = "0.2.0"
+version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "45e46c0661abb7180e7b9c281db115305d49ca1709ab8242adf09666d2173c65"
+checksum = "f0805222e57f7521d6a62e36fa9163bc891acd422f971defe97d64e70d0a4fe5"
 
 [[package]]
 name = "windows-sys"
@@ -1053,9 +1053,9 @@ dependencies = [
 
 [[package]]
 name = "windows-sys"
-version = "0.61.1"
+version = "0.61.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6f109e41dd4a3c848907eb83d5a42ea98b3769495597450cf6d153507b166f0f"
+checksum = "ae137229bcbd6cdf0f7b80a31df61766145077ddf49416a728b02cb3921ff3fc"
 dependencies = [
  "windows-link",
 ]
