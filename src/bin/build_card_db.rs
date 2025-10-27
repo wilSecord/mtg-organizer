@@ -4,6 +4,7 @@ use project::data_model::card::{
     self, Card, CardRef, Color, ColorCombination, ManaCost, ManaSymbol, Supertype,
 };
 use project::dbs::allcards::cardref_key::card_ref_to_index;
+use project::dbs::allcards::AllCardsDb;
 use serde_json;
 use std::collections::BTreeMap;
 use std::fs::File;
@@ -293,18 +294,7 @@ fn main() -> io::Result<()> {
     let json_cards: serde_json::Value =
         serde_json::from_reader(rdr).expect("Bad data in <cards_file>");
 
-    let db = StoredTree::<1, 8000, u128, Card>::new_with_storage(
-        u128::MIN..=u128::MAX,
-        MultitypePagedStorage::open(
-            File::options()
-                .create(true)
-                .append(false)
-                .write(true)
-                .read(true)
-                .open(db_file)
-                .expect("Could not open <db_file>"),
-        ),
-    );
+    let db = AllCardsDb::open(db_file).expect("Could not open <db_file>");    
 
     let cards_arr = match json_cards {
         serde_json::Value::Array(values) => values,
@@ -323,8 +313,7 @@ fn main() -> io::Result<()> {
         let cardref = sets
             .get(&card.name)
             .expect(&format!("'{}' must have a collector's number", card.name));
-        let k = card_ref_to_index(&cardref);
-        db.insert(k, card);
+        db.add(cardref, card);
 
         eprintln!("{i}/{card_last_idx}");
     }
