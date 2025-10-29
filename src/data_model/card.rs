@@ -26,7 +26,7 @@ pub struct PhysicalCard {
     pub duplicates: usize,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Card {
     pub name: String,
     pub mana_cost: ManaCost,
@@ -46,13 +46,13 @@ pub struct Card {
     pub game_changer: bool,
 }
 
-#[derive(Debug, Clone)]
 ///
 /// Represents some non-negative integer on a MtG card which
 /// can be a set value or can be controlled by some
 /// manner of game state (e.g. Plague Rats)
 /// Even if the value is technically fixed, if it's infinite or
 /// negative then it will be treated as dynamic.
+#[derive(Debug, Clone, PartialEq)]
 pub enum CardDynamicNumber {
     Set(usize),
     Dynamic,
@@ -78,7 +78,7 @@ impl FromStr for CardDynamicNumber {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Supertype {
     Basic,
     Legendary,
@@ -89,7 +89,7 @@ pub enum Supertype {
     Host,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Rarity {
     Common,
     Uncommon,
@@ -98,7 +98,7 @@ pub enum Rarity {
     Special,
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, PartialOrd, Eq, Ord)]
 pub struct ColorCombination {
     pub white: bool,
     pub blue: bool,
@@ -119,10 +119,10 @@ pub enum NormalManaSymbol {
     Colorless,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct ManaCost(pub Vec<ManaSymbol>);
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Color {
     White,
     Blue,
@@ -132,13 +132,13 @@ pub enum Color {
     Colorless,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum ManaVariable {
     X,
     Y,
     Z,
 }
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum ManaSymbol {
     Variable(ManaVariable),
     GenericNumber(usize),

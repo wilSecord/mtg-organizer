@@ -56,7 +56,7 @@ dependencies = [
 [[package]]
 name = "btree_vec"
 version = "0.1.0"
-source = "git+https://github.com/chlohal/tiny-maps.git#7d60147c9cc068d47f22d8b53b2c289cd81254e4"
+source = "git+https://github.com/chlohal/tiny-maps.git#112e9c9171d372fc56cab8952c38bedacefc7d18"
 
 [[package]]
 name = "cassowary"
@@ -241,7 +241,7 @@ dependencies = [
 [[package]]
 name = "debug_logs"
 version = "0.1.0"
-source = "git+https://github.com/chlohal/tiny-maps.git#7d60147c9cc068d47f22d8b53b2c289cd81254e4"
+source = "git+https://github.com/chlohal/tiny-maps.git#112e9c9171d372fc56cab8952c38bedacefc7d18"
 
 [[package]]
 name = "derive_more"
@@ -494,12 +494,12 @@ dependencies = [
 [[package]]
 name = "lru_cache"
 version = "0.1.0"
-source = "git+https://github.com/chlohal/tiny-maps.git#7d60147c9cc068d47f22d8b53b2c289cd81254e4"
+source = "git+https://github.com/chlohal/tiny-maps.git#112e9c9171d372fc56cab8952c38bedacefc7d18"
 
 [[package]]
 name = "lutmorton"
 version = "0.1.0"
-source = "git+https://github.com/chlohal/tiny-maps.git#7d60147c9cc068d47f22d8b53b2c289cd81254e4"
+source = "git+https://github.com/chlohal/tiny-maps.git#112e9c9171d372fc56cab8952c38bedacefc7d18"
 
 [[package]]
 name = "memchr"
@@ -510,7 +510,7 @@ checksum = "f52b00d39961fc5b2736ea853c9cc86238e165017a493d1d5c8eac6bdc4cc273"
 [[package]]
 name = "minimal_storage"
 version = "0.1.0"
-source = "git+https://github.com/chlohal/tiny-maps.git#7d60147c9cc068d47f22d8b53b2c289cd81254e4"
+source = "git+https://github.com/chlohal/tiny-maps.git#112e9c9171d372fc56cab8952c38bedacefc7d18"
 dependencies = [
  "btree_vec",
  "debug_logs",
@@ -932,7 +932,7 @@ dependencies = [
 [[package]]
 name = "tree"
 version = "0.1.0"
-source = "git+https://github.com/chlohal/tiny-maps.git#7d60147c9cc068d47f22d8b53b2c289cd81254e4"
+source = "git+https://github.com/chlohal/tiny-maps.git#112e9c9171d372fc56cab8952c38bedacefc7d18"
 dependencies = [
  "btree_vec",
  "debug_logs",

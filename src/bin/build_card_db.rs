@@ -3,8 +3,8 @@ use minimal_storage::multitype_paged_storage::MultitypePagedStorage;
 use project::data_model::card::{
     self, Card, CardRef, Color, ColorCombination, ManaCost, ManaSymbol, Supertype,
 };
-use project::dbs::allcards::cardref_key::card_ref_to_index;
 use project::dbs::allcards::AllCardsDb;
+use project::dbs::allcards::cardref_key::card_ref_to_index;
 use serde_json;
 use std::collections::BTreeMap;
 use std::fs::File;
@@ -83,12 +83,14 @@ fn parse_card(card: serde_json::Value) -> Card {
             .as_str()
             .expect("Bad types")
             .split(", ")
+            .filter(|x| !x.is_empty())
             .map(String::from)
             .collect(),
         subtypes: card["subtypes"]
             .as_str()
             .expect("Bad types")
             .split(", ")
+            .filter(|x| !x.is_empty())
             .map(String::from)
             .collect(),
         loyalty: stringified_num(&card["loyalty"]),
@@ -156,12 +158,10 @@ fn parse_mana_symbol(src: &str) -> ManaSymbol {
         "1000000" => return ManaSymbol::OneMillionGenericMana,
         _ => {}
     }
-    
+
     if src.chars().all(|x| x.is_ascii_digit()) {
         return ManaSymbol::GenericNumber(src.parse().unwrap());
     }
-
-    
 
     //having completed that, it's definitely going to be a conventional coloured
     // mana symbol of some kind.
@@ -294,7 +294,7 @@ fn main() -> io::Result<()> {
     let json_cards: serde_json::Value =
         serde_json::from_reader(rdr).expect("Bad data in <cards_file>");
 
-    let db = AllCardsDb::open(db_file).expect("Could not open <db_file>");    
+    let db = AllCardsDb::open(db_file).expect("Could not open <db_file>");
 
     let cards_arr = match json_cards {
         serde_json::Value::Array(values) => values,
@@ -319,4 +319,43 @@ fn main() -> io::Result<()> {
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod test {
+    use std::{
+        fs::File,
+        io::{BufReader, Read},
+    };
+
+    use minimal_storage::serialize_min::{DeserializeFromMinimal, SerializeMinimal};
+    use project::data_model::card::Card;
+
+    #[test]
+    fn serde_deserde_cards() {
+        let cards_file = "data/cards.json";
+
+        let rdr = BufReader::new(File::open(cards_file).expect("Can't open <cards_file>"));
+        let json_cards: Vec<serde_json::Value> =
+            serde_json::from_reader(rdr).expect("Bad data in <cards_file>");
+
+        let mut store_buf = Vec::<u8>::new();
+
+        for (i, card) in json_cards.into_iter().enumerate().skip(1) {
+            eprintln!("Card {i}...");
+            let card = crate::parse_card(card);
+            card.minimally_serialize(&mut store_buf, ()).unwrap();
+            eprintln!(
+                "{}",
+                store_buf
+                    .iter()
+                    .map(|x| format!("{x:0<2x} "))
+                    .collect::<String>()
+            );
+            let card_roundtrip = Card::deserialize_minimal(&mut &store_buf[..], ()).unwrap();
+
+            debug_assert_eq!(card, card_roundtrip);
+            store_buf.truncate(0);
+        }
+    }
 }

@@ -9,24 +9,24 @@ use tree::sparse::structure::{Inner, Root};
 
 use crate::{
     data_model::card::{Card, CardRef},
-    dbs::allcards::{cardref_key::card_ref_to_index, db_layout::AllCardsDbLayout},
+    dbs::{
+        allcards::cardref_key::card_ref_to_index, indexes::color_combination::ColorCombinationMaybe,
+    },
 };
 
 pub mod cardref_key;
 mod db_layout;
 
-type DBTree<Key, Value> = tree::sparse::StoredTree<
-    1,
+pub use db_layout::AllCardsDb;
+
+type DBTree<const DIMENSIONS: usize, Key, Value> = tree::sparse::StoredTree<
+    DIMENSIONS,
     8000,
     Key,
     Value,
-    Page<{ tree::PAGE_SIZE }, Root<1, 8000, u128, Card>, std::fs::File>,
-    SingleTypeView<{ tree::PAGE_SIZE }, std::fs::File, Inner<1, 8000, u128, Card>>,
+    Page<{ tree::PAGE_SIZE }, Root<DIMENSIONS, 8000, Key, Value>, std::fs::File>,
+    SingleTypeView<{ tree::PAGE_SIZE }, std::fs::File, Inner<DIMENSIONS, 8000, Key, Value>>,
 >;
-
-pub struct AllCardsDb {
-    cards: DBTree<u128, Card>,
-}
 
 impl AllCardsDb {
     pub fn open<P: AsRef<Path>>(path: P) -> std::io::Result<Self> {
@@ -40,37 +40,22 @@ impl AllCardsDb {
         let storage = MultitypePagedStorage::open(file);
 
         //the layout is ALWAYS stored at page #1
-        match StoreByPage::<AllCardsDbLayout>::get(&storage, &PageId::new(1), ()) {
-            Some(layout) => {
-                let layout_read = layout.read();
-
-                let cards = tree::sparse::open_storage(
-                    u128::MIN..=u128::MAX,
-                    &storage,
-                    Some(layout_read.cards_page),
-                );
-
-                Ok(AllCardsDb { cards })
-            }
-            None => {
-                let mut db_swap = None::<Self>;
-                let layout_id = storage.new_page_with(|| {
-                    let cards = tree::sparse::open_storage(u128::MIN..=u128::MAX, &storage, None);
-                    let cards_page = cards.root_page_id();
-
-                    db_swap = Some(AllCardsDb { cards });
-
-                    AllCardsDbLayout { cards_page }
-                });
-
-                Ok(db_swap.unwrap())
-            }
-        }
+        db_layout::initialize_or_deserialize_db_layout(&storage)
     }
 
+    pub fn query_color<'a>(&'a self, color: &'a ColorCombinationMaybe) -> impl Iterator<Item = impl AsRef<Card> + 'a> + 'a {
+        self.color.find_items_in_box(&color).flat_map(|x| self.cards.get_readref(&x))
+    }
+
+    pub fn all_cards(&self) -> impl Iterator<Item = Card> {
+        self.cards.find_items_in_box(&(u128::MIN..=u128::MAX))
+    }
+    
     pub fn add(&self, cardref: &CardRef, card: Card) {
         let id = card_ref_to_index(cardref);
 
+        self.color.insert(card.color, id);
+        self.color_id.insert(card.color_id, id);
         self.cards.insert(id, card);
     }
 }

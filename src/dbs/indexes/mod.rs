@@ -5,6 +5,8 @@
 //Almost all of these work by converting to/from an unsigned integer of one type or another.
 
 pub mod string;
+pub mod color_combination;
+
 
 //general helpers for index wrappers
 mod helpers;

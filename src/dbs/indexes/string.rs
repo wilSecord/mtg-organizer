@@ -1,4 +1,4 @@
-use std::{borrow::Cow, cmp::Ordering};
+use std::{borrow::Cow, cmp::Ordering, fmt::Debug};
 
 use minimal_storage::{
     serialize_fast::MinimalSerdeFast,
@@ -12,7 +12,7 @@ use tree::{
 #[derive(Debug, Clone, Copy)]
 pub struct StringLongestPrefix {
     bitlen: usize,
-    bitbuf: u128
+    bitbuf: u128,
 }
 
 impl DeserializeFromMinimal for StringLongestPrefix {
@@ -45,7 +45,10 @@ impl MinimalSerdeFast for StringLongestPrefix {
         _external_data: <Self as SerializeMinimal>::ExternalData<'s>,
     ) -> std::io::Result<()> {
         self.bitlen.minimally_serialize(write_to, ())?;
-        write_to.write_all(&self.bitbuf[0..(self.bitlen / 8)])
+
+        let shift = u128::BITS as usize - self.bitlen;
+
+        (self.bitbuf >> shift).minimally_serialize(write_to, ())
     }
 
     fn fast_deserialize_minimal<'a, 'd: 'a, R: std::io::Read>(
@@ -54,8 +57,10 @@ impl MinimalSerdeFast for StringLongestPrefix {
     ) -> Result<Self, std::io::Error> {
         let bitlen = usize::deserialize_minimal(from, ())?;
 
-        let mut bitbuf = [0u8; MAX_LEN_BYTES];
-        from.read_exact(&mut bitbuf[..(bitlen / 8)])?;
+        let mut bitbuf = u128::deserialize_minimal(from, ())?;
+        let shift = u128::BITS as usize - bitlen;
+
+        bitbuf <<= shift;
 
         Ok(Self { bitlen, bitbuf })
     }
@@ -82,54 +87,6 @@ impl Eq for StringLongestPrefix {}
 impl Ord for StringLongestPrefix {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         self.bitbuf.cmp(&other.bitbuf)
-        let equal_extent = std::cmp::min(self.bitlen, other.bitlen);
-
-        for i in 0..equal_extent {
-            let byte = i / 8;
-            let bit = 7 - (i % 8);
-
-            let self_bit = (self.bitbuf[byte] >> bit) & 1;
-            let other_bit = (other.bitbuf[byte] >> bit) & 1;
-
-            if self_bit == other_bit {
-                continue;
-            }
-
-            if self_bit > other_bit {
-                return Ordering::Greater;
-            } else {
-                return Ordering::Less;
-            }
-        }
-
-        //if we've made it here, then they're equal up unto the prefix.
-        //At this point, if they're of equal length, then they're the same
-        //LPM.
-        if self.bitlen == other.bitlen {
-            return Ordering::Equal;
-        }
-        //otherwise, decide based on the next bit from the longer one.
-        let last_bit_index = equal_extent - 1;
-        let last_byte = last_bit_index / 8;
-        let last_bit = 7 - (last_bit_index % 8);
-
-        let (self_nextbit, other_nextbit) = if self.bitlen > other.bitlen {
-            (Some((self.bitbuf[last_byte] >> last_bit) != 0), None)
-        } else {
-            (None, Some((other.bitbuf[last_byte] >> last_bit) != 0))
-        };
-
-        //we consider any shorter prefix to be exactly in the middle of all of its possible suffixes.
-        match (self_nextbit, other_nextbit) {
-            (None, None) => unreachable!(),
-            (Some(_), Some(_)) => unreachable!(),
-
-            (None, Some(true)) => Ordering::Less,
-            (None, Some(false)) => Ordering::Greater,
-
-            (Some(true), None) => Ordering::Greater,
-            (Some(false), None) => Ordering::Less,
-        }
     }
 }
 
@@ -141,7 +98,7 @@ impl MultidimensionalParent<1> for StringLongestPrefix {
     }
 
     fn overlaps(&self, child: &Self) -> bool {
-        //there's no way that it can overlap without being contained 
+        //there's no way that it can overlap without being contained
         self.contains(child)
     }
 
@@ -150,9 +107,7 @@ impl MultidimensionalParent<1> for StringLongestPrefix {
         let mut r = self.to_owned();
         l.push_bit(false);
         r.push_bit(true);
-        (
-            l,r
-        )
+        (l, r)
     }
 }
 
@@ -168,32 +123,24 @@ impl MultidimensionalKey<1> for StringLongestPrefix {
             return false;
         }
 
-        for i in 0..parent.bitlen {
-            let byte = i / 8;
-            let bit = 7 - (i % 8);
-
-            let self_bit = (self.bitbuf[byte] >> bit) & 1;
-            let other_bit = (parent.bitbuf[byte] >> bit) & 1;
-
-            if self_bit != other_bit {
-                return false;
-            }
-        }
-
-        return true;
+        (self.bitbuf >> parent.bitlen) == (parent.bitbuf >> parent.bitlen)
     }
 
     fn delta_from_parent(&self, parent: &Self::Parent) -> Self::DeltaFromParent {
-        let delta_len = self
-            .bitlen
-            .checked_sub(parent.bitlen)
-            .expect("Children should be checked to be inside the parent!");
+        let delta_len = self.bitlen - parent.bitlen;
+        let delta_amnt = parent.bitbuf ^ self.bitbuf;
 
-        let delta_amnt = 
+        Self {
+            bitlen: delta_len,
+            bitbuf: delta_amnt,
+        }
     }
 
     fn apply_delta_from_parent(delta: &Self::DeltaFromParent, parent: &Self::Parent) -> Self {
-        todo!()
+        Self {
+            bitlen: delta.bitlen + parent.bitlen,
+            bitbuf: delta.bitbuf | parent.bitbuf,
+        }
     }
 
     fn smallest_key_in(parent: &Self::Parent) -> Self {
@@ -223,19 +170,38 @@ impl MultidimensionalKey<1> for StringLongestPrefix {
     }
 }
 
+pub struct StringTooLongErr;
+
+impl Debug for StringTooLongErr {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(
+            "[String too long; strings in DB keys must be <= 16 bytes long after compression]",
+        )
+    }
+}
+
 impl StringLongestPrefix {
     fn push_bit(&mut self, new_bit_value: bool) {
+        self.bitbuf |= (new_bit_value as u128) << self.bitlen;
         self.bitlen += 1;
-        let bitlen = self.bitlen + 1;
-        let bit = 7 - ((bitlen - 1) % 8);
-        let byte = (bitlen - 1) / 8;
+    }
+    pub fn new<S: std::borrow::Borrow<str>>(s: S) -> Result<Self, StringTooLongErr> {
+        let mut write = Vec::new();
 
-        //like how dividing an integer silently truncates, it's okay to silently
-        //truncate at this level of detail. Any conversion from a String will
-        //make sure that it's valid anyway
-        if byte < MAX_LEN_BYTES {
-            self.bitbuf[byte] |= (new_bit_value as u8) << bit;
-        }
+        const MAX_BYTES: usize = u128::BITS as usize / 8;
+
+        s.borrow()
+            .minimally_serialize(&mut &mut write[0..MAX_BYTES], 0.into())
+            .map_err(|_| StringTooLongErr)?;
+
+        let written_length = write.len();
+
+        write.extend(std::iter::repeat_n(0u8, MAX_BYTES - write.len()));
+
+        Ok(Self {
+            bitbuf: u128::from_be_bytes(write.try_into().unwrap()),
+            bitlen: written_length * 8
+        })
     }
 }
 
@@ -249,7 +215,7 @@ impl Default for StringLongestPrefix {
     fn default() -> Self {
         Self {
             bitlen: 0,
-            bitbuf: [0; MAX_LEN_BYTES],
+            bitbuf: 0,
         }
     }
 }

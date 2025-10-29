@@ -7,7 +7,8 @@ use minimal_storage::{
 };
 
 use crate::data_model::card::{
-    Card, CardDynamicNumber, Color, ColorCombination, ManaCost, ManaSymbol, ManaVariable, Rarity, Supertype
+    Card, CardDynamicNumber, Color, ColorCombination, ManaCost, ManaSymbol, ManaVariable, Rarity,
+    Supertype,
 };
 
 impl MinimalSerdeFast for Card {
@@ -50,7 +51,7 @@ impl DeserializeFromMinimal for Card {
         };
         let name = String::deserialize_minimal(from, Some(name_fb))?;
 
-        let mana_value = usize::deserialize_minimal(from, ())? as f64 * 4.0;
+        let mana_value = usize::deserialize_minimal(from, ())? as f64 / 4.0;
 
         let mana_cost = ManaCost::deserialize_minimal(from, ())?;
 
@@ -128,23 +129,10 @@ impl SerializeMinimal for Card {
 
         write_supertype_list(&self.super_types, write_to)?;
 
-        self.types.len().minimally_serialize(write_to, ())?;
-        for t in &self.types {
-            //TODO: make a string pool or smth to hold these in
-            t.as_str().minimally_serialize(write_to, 0u8.into())?;
-        }
-
-        self.subtypes.len().minimally_serialize(write_to, ())?;
-        for t in &self.subtypes {
-            //TODO: make a string pool or smth to hold these in
-            t.as_str().minimally_serialize(write_to, 0u8.into())?;
-        }
-
-        self.sets_released.len().minimally_serialize(write_to, ())?;
-        for t in &self.sets_released {
-            //TODO: make a string pool or smth to hold these in
-            t.as_str().minimally_serialize(write_to, 0u8.into())?;
-        }
+        //TODO: make a stringpool or smth to hold these in
+        Vec::<String>::minimally_serialize(&self.types, write_to, 0u8.into())?;
+        Vec::<String>::minimally_serialize(&self.subtypes, write_to, 0u8.into())?;
+        Vec::<String>::minimally_serialize(&self.sets_released, write_to, 0u8.into())?;
 
         //put game_changer in the extra bits of the oracle text
         let game_changer_byte = (self.game_changer as u8) << 7;
@@ -164,9 +152,19 @@ impl SerializeMinimal for Card {
 
 fn read_supertype_list(read_from: &mut impl std::io::Read) -> std::io::Result<Vec<Supertype>> {
     let mut vec = Vec::new();
-    loop {
-        let b = read_from.read_one()?;
+    let mut b = read_from.read_one()?;
 
+    //check for the 'empty list' sigil: 
+    //TWO 'final elements' in the same byte.
+    //if we experience that, end right away!
+    //
+    //This check only needs to be ran in the first
+    //byte, so take it outside of the loop.
+    if (b & !0b1000_1000) == b {
+        return Ok(vec);
+    }
+
+    loop {
         for nibble in [b >> 4, b & 0b1111] {
             vec.push(match nibble & 0b111 {
                 0 => Supertype::Basic,
@@ -178,10 +176,13 @@ fn read_supertype_list(read_from: &mut impl std::io::Read) -> std::io::Result<Ve
                 6 => Supertype::Host,
                 _ => return Err(ErrorKind::InvalidData.into()),
             });
-            if nibble & 0b1000 > 0 {
+            //if the MSB is set, there are more values to go.
+            //if it's unset, then return the results
+            if nibble >> 3 == 0 {
                 return Ok(vec);
             }
         }
+        b = read_from.read_one()?;
     }
 }
 
@@ -189,13 +190,21 @@ fn write_supertype_list(
     super_types: &Vec<Supertype>,
     write_to: &mut impl std::io::Write,
 ) -> std::io::Result<()> {
+    //if it's empty, then there's no 'last element' to have the end sigil.
+    //as such, stick in a byte with _two_ 'last element's, which will never
+    //occur otherwise. This will indicate an empty list. It's also happily
+    //a nul byte, so it's intuitively empty!
+    if super_types.is_empty() {
+        return write_to.write_all(&[0b0000_0000]);
+    }
+
     let total_itms = super_types.len();
     let mut itms_consumed = 0;
     for chunk in super_types.chunks(2) {
         let mut b = 0u8;
         for itm in chunk {
             itms_consumed += 1;
-            let is_last = total_itms == itms_consumed;
+            let more_items_exist = total_itms != itms_consumed;
 
             let itm_b = match itm {
                 Supertype::Basic => 0,
@@ -208,12 +217,42 @@ fn write_supertype_list(
             };
             debug_assert!(itm_b <= 0b111);
 
-            b |= ((is_last as u8) << 3) | itm_b;
+            //shift the previous elements over BEFORE we OR with the
+            //current element
             b <<= 4;
+            b |= ((more_items_exist as u8) << 3) | itm_b;
         }
+        //if it's the last chunk and it's only a single element, then
+        //there was no second element to shift over the first.
+        //therefore, do it now before writing.
+        if chunk.len() == 1 {
+            b <<= 4;
+            //and just make the final nibble all 1s to prevent
+            // decoding a single-elem list from seeing two final
+            // elements and deciding that it's none.
+            b |= 0b1111;
+        } 
+
         write_to.write_all(&[b])?;
     }
     Ok(())
+}
+
+#[cfg(test)]
+#[test]
+fn test_supertype_list_serde() {
+    fn roundtrip(original: Vec<Supertype>) {
+        let mut buf = Vec::new();
+        write_supertype_list(&original, &mut &mut buf).unwrap();
+        let roundtripped = read_supertype_list(&mut &buf[..]).unwrap();
+
+        debug_assert_eq!(original, roundtripped)
+    }
+
+    roundtrip(vec![Supertype::Basic]);
+    roundtrip(vec![Supertype::Basic, Supertype::Snow]);
+    roundtrip(vec![Supertype::Basic, Supertype::Snow, Supertype::Basic]);
+    roundtrip(vec![Supertype::Basic, Supertype::Snow, Supertype::Basic]);
 }
 
 impl SerializeMinimal for ColorCombination {
@@ -245,7 +284,7 @@ impl DeserializeFromMinimal for CardDynamicNumber {
     ) -> Result<Self, std::io::Error> {
         match usize::deserialize_minimal(from, ())? {
             0 => Ok(CardDynamicNumber::Dynamic),
-            n => Ok(CardDynamicNumber::Set(n.checked_sub(1).unwrap()))
+            n => Ok(CardDynamicNumber::Set(n - 1)),
         }
     }
 }
@@ -259,7 +298,10 @@ impl SerializeMinimal for CardDynamicNumber {
         _: Self::ExternalData<'s>,
     ) -> std::io::Result<()> {
         match self {
-            CardDynamicNumber::Set(non_zero) => non_zero.checked_add(1).unwrap().minimally_serialize(write_to, ()),
+            CardDynamicNumber::Set(set_number) => set_number
+                .checked_add(1)
+                .unwrap()
+                .minimally_serialize(write_to, ()),
             CardDynamicNumber::Dynamic => 0usize.minimally_serialize(write_to, ()),
         }
     }
@@ -327,7 +369,7 @@ impl DeserializeFromMinimal for ManaSymbol {
         from: &'a mut R,
         _: Self::ExternalData<'d>,
     ) -> Result<Self, std::io::Error> {
-        from.read_one().map(byte_to_mana_symbol)
+        from.read_one().and_then(byte_to_mana_symbol)
     }
 }
 
@@ -350,10 +392,13 @@ fn mana_symbol_to_byte(ms: &ManaSymbol) -> u8 {
             //if wotc makes a card that costs 20 generic mana i am
             //going to kick a can up the road.
             let lsb = (num + 42) as u8;
-            debug_assert!(lsb < 63, "The maximum generic mana that can be stored is 20, but this is {num}");
+            assert!(
+                lsb < 0b1100_0000,
+                "The maximum generic mana that can be stored is 20, but this is {num}"
+            );
             debug_assert!(lsb >= 42);
 
-            0b1100_0000 | (*num as u8)
+            0b1100_0000 | lsb
         }
         ManaSymbol::ConventionalColored {
             phyrexian,
@@ -393,21 +438,25 @@ fn mana_symbol_to_byte(ms: &ManaSymbol) -> u8 {
     }
 }
 
-fn byte_to_mana_symbol(ms: u8) -> ManaSymbol {
+fn byte_to_mana_symbol(ms: u8) -> std::io::Result<ManaSymbol> {
     //handle holes that are allocated to other cases
     match ms {
-        42 => return ManaSymbol::Snow,
-        43 => return ManaSymbol::Variable(ManaVariable::X),
-        44 => return ManaSymbol::Variable(ManaVariable::Y),
-        45 => return ManaSymbol::Variable(ManaVariable::Z),
-        46 => return ManaSymbol::LandDrop,
-        47 => return ManaSymbol::Legendary,
-        48 => return ManaSymbol::HalfWhite,
-        49 => return ManaSymbol::OneMillionGenericMana,
-        ms if ms >> 6 == 0b11 && ms & 0b0011_1111 >= 42 => {
-            return ManaSymbol::GenericNumber((ms & 0b1_1111) as usize);
-        }
+        42 => return Ok(ManaSymbol::Snow),
+        43 => return Ok(ManaSymbol::Variable(ManaVariable::X)),
+        44 => return Ok(ManaSymbol::Variable(ManaVariable::Y)),
+        45 => return Ok(ManaSymbol::Variable(ManaVariable::Z)),
+        46 => return Ok(ManaSymbol::LandDrop),
+        47 => return Ok(ManaSymbol::Legendary),
+        48 => return Ok(ManaSymbol::HalfWhite),
+        49 => return Ok(ManaSymbol::OneMillionGenericMana),
         _ => {}
+    }
+
+    //handle the generic mana case, which is any 2MSB set to 0b11 
+    //and 6LSB above 41.
+    if ms & 0b1100_0000 != 0 && ms & 0b0011_1111 >= 42 {
+        let num = (ms & 0b11_1111) as usize - 42;
+        return Ok(ManaSymbol::GenericNumber(num));
     }
 
     let phyrexian = (ms & 0b1000_0000) > 0;
@@ -439,10 +488,10 @@ fn byte_to_mana_symbol(ms: u8) -> ManaSymbol {
         _ => None,
     };
 
-    ManaSymbol::ConventionalColored {
+    Ok(ManaSymbol::ConventionalColored {
         phyrexian,
         split_two_generic,
         color,
         split_color,
-    }
+    })
 }
