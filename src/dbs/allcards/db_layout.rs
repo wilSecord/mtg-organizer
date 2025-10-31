@@ -1,6 +1,9 @@
 use crate::{
     data_model::card::ColorCombination,
-    dbs::allcards::{Card, DBTree},
+    dbs::{
+        allcards::{Card, DBTree},
+        indexes::mana_cost::{self, ManaCostCount},
+    },
 };
 use minimal_storage::{
     multitype_paged_storage::{MultitypePagedStorage, StoragePage, StoreByPage},
@@ -9,7 +12,7 @@ use minimal_storage::{
 };
 
 macro_rules! layout_all_cards_db {
-    ( $($index_name:ident : $index_type:ident $index_dim:literal dimensional $(,)? )* ) => {
+    ( $($index_name:ident : $index_type:ty : $index_dim:literal dimensional $(,)? )* ) => {
         pub struct AllCardsDbLayout {
             pub cards_page: PageId<{ tree::PAGE_SIZE }>,
 
@@ -65,8 +68,9 @@ macro_rules! layout_all_cards_db {
                     storage,
                     Some(layout_read.cards_page),
                 );
+                use tree::tree_traits::MultidimensionalParent;
 
-                $( let $index_name = tree::sparse::open_storage($index_type::universal_parent(), storage, Some(layout_read.$index_name)); )*
+                $( let $index_name = tree::sparse::open_storage(<$index_type as tree::tree_traits::MultidimensionalKey<$index_dim>>::Parent::UNIVERSE, storage, Some(layout_read.$index_name)); )*
 
                 Ok(AllCardsDb { cards, $( $index_name, )* })
             }
@@ -76,10 +80,12 @@ macro_rules! layout_all_cards_db {
                     let cards = tree::sparse::open_storage(u128::MIN..=u128::MAX, storage, None);
                     let cards_page = cards.root_page_id();
 
+                    use tree::tree_traits::MultidimensionalParent;
+
                     $(
                                                     //just reusing the known_layout_page_id to have something to put there for now. It will be overwritten
                                                     //in the next statement.
-                        let mut $index_name = (tree::sparse::open_storage($index_type::universal_parent(), storage, None), known_layout_page_id);
+                        let mut $index_name = (tree::sparse::open_storage(<$index_type as tree::tree_traits::MultidimensionalKey<$index_dim>>::Parent::UNIVERSE, storage, None), known_layout_page_id);
                         $index_name.1 = $index_name.0.root_page_id();
                     )*
 
@@ -98,8 +104,9 @@ macro_rules! layout_all_cards_db {
 }
 
 layout_all_cards_db! {
-    color: ColorCombination 6 dimensional,
-    color_id: ColorCombination 6 dimensional,
+    color: ColorCombination: 6 dimensional,
+    color_id: ColorCombination:  6 dimensional,
+    mana_cost: ManaCostCount::Key: 12 dimensional,
     //todo: implement indexes for supertypes,
     //float (mana_value), rarity
 }

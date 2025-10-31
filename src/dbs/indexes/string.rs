@@ -6,7 +6,7 @@ use minimal_storage::{
 };
 use tree::{
     sparse::SparseKey,
-    tree_traits::{MultidimensionalKey, MultidimensionalParent, Zero},
+    tree_traits::{MinValue, MultidimensionalKey, MultidimensionalParent, Zero},
 };
 
 #[derive(Debug, Clone, Copy)]
@@ -92,6 +92,11 @@ impl Ord for StringLongestPrefix {
 
 impl MultidimensionalParent<1> for StringLongestPrefix {
     type DimensionEnum = ();
+
+    const UNIVERSE: Self = Self {
+        bitlen: 0,
+        bitbuf: 0,
+    };
 
     fn contains(&self, child: &Self) -> bool {
         child.is_contained_in(self)
@@ -200,15 +205,16 @@ impl StringLongestPrefix {
 
         Ok(Self {
             bitbuf: u128::from_be_bytes(write.try_into().unwrap()),
-            bitlen: written_length * 8
+            bitlen: written_length * 8,
         })
     }
 }
 
-impl Zero for StringLongestPrefix {
-    fn zero() -> Self {
-        Default::default()
-    }
+impl MinValue for StringLongestPrefix {
+    const MIN: Self = Self {
+        bitlen: 0,
+        bitbuf: 0,
+    };
 }
 
 impl Default for StringLongestPrefix {

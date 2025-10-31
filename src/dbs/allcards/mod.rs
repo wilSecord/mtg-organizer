@@ -5,12 +5,12 @@ use minimal_storage::{
     paged_storage::{Page, PageId},
     pooled_storage::Filelike,
 };
-use tree::sparse::structure::{Inner, Root};
+use tree::{sparse::structure::{Inner, Root}, tree_traits::MultidimensionalParent};
 
 use crate::{
     data_model::card::{Card, CardRef},
     dbs::{
-        allcards::cardref_key::card_ref_to_index, indexes::color_combination::ColorCombinationMaybe,
+        allcards::cardref_key::card_ref_to_index, indexes::{color_combination::ColorCombinationMaybe, mana_cost::ManaCostCount},
     },
 };
 
@@ -46,9 +46,16 @@ impl AllCardsDb {
     pub fn query_color<'a>(&'a self, color: &'a ColorCombinationMaybe) -> impl Iterator<Item = impl AsRef<Card> + 'a> + 'a {
         self.color.find_items_in_box(&color).flat_map(|x| self.cards.get_readref(&x))
     }
+    pub fn query_mana<'a>(&'a self, query: &'a ManaCostCount::Query) -> impl Iterator<Item = impl AsRef<Card> + 'a> + 'a {
+        self.mana_cost.find_items_in_box(&query).flat_map(|x| self.cards.get_readref(&x))
+    }
 
     pub fn all_cards(&self) -> impl Iterator<Item = Card> {
         self.cards.find_items_in_box(&(u128::MIN..=u128::MAX))
+    }
+
+    pub fn manas(&self) -> impl Iterator<Item = ManaCostCount::Key> {
+        self.mana_cost.find_entries_in_box(&ManaCostCount::Query::UNIVERSE).map(|x| x.0)
     }
     
     pub fn add(&self, cardref: &CardRef, card: Card) {
@@ -56,6 +63,8 @@ impl AllCardsDb {
 
         self.color.insert(card.color, id);
         self.color_id.insert(card.color_id, id);
+        self.mana_cost.insert(ManaCostCount::Key::new(&card.mana_cost), id);
+
         self.cards.insert(id, card);
     }
 }

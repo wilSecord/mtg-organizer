@@ -6,7 +6,7 @@
 
 pub mod string;
 pub mod color_combination;
-
+pub mod mana_cost;
 
 //general helpers for index wrappers
 mod helpers;

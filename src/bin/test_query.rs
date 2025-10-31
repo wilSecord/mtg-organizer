@@ -6,6 +6,7 @@ use project::data_model::card::{
 use project::dbs::allcards::AllCardsDb;
 use project::dbs::allcards::cardref_key::card_ref_to_index;
 use project::dbs::indexes::color_combination::ColorCombinationMaybe;
+use project::dbs::indexes::mana_cost::ManaCostCount;
 use serde_json;
 use std::collections::BTreeMap;
 use std::fs::File;
@@ -15,7 +16,7 @@ use std::time::Instant;
 use std::u128;
 use tree::sparse::structure::StoredTree;
 
-const TESTS: usize = 1000;
+const TESTS: usize = 10_000;
 
 fn main() -> io::Result<()> {
     let db_file = std::env::args()
@@ -29,7 +30,7 @@ fn main() -> io::Result<()> {
     let start = Instant::now();
 
     for i in 0..TESTS {
-        total_found += db.query_color(&make_color_combination_maybe(i)).count();
+        total_found += db.query_mana(&make_mana_query(i)).count();
     }
 
     let end = Instant::now();
@@ -38,10 +39,62 @@ fn main() -> io::Result<()> {
     let avg_res_per_search = (total_found as f64) / (TESTS as f64);
     let avg_time_per_search = test_dur_ms / (TESTS as f64);
 
-    println!("Ran {TESTS} iterations in {test_dur_ms}ms, found {total_found} cumulative results
-            (average of {avg_res_per_search} results and {avg_time_per_search}ms per search)");
+    println!(
+        "Ran {TESTS} iterations in {test_dur_ms}ms, found {total_found} cumulative results
+            (average of {avg_res_per_search} results and {avg_time_per_search}ms per search)"
+    );
 
     Ok(())
+}
+
+fn make_mana_query(mut index: usize) -> ManaCostCount::Query {    
+    let field_querying = index % 12;
+    index /= 12;
+    let value_querying = index % 5;
+
+    let mut num_white = 0..=usize::MAX;
+    let mut num_blue = 0..=usize::MAX;
+    let mut num_black = 0..=usize::MAX;
+    let mut num_red = 0..=usize::MAX;
+    let mut num_green = 0..=usize::MAX;
+    let mut num_colorless = 0..=usize::MAX;
+    let mut num_generic = 0..=usize::MAX;
+    let mut num_any_phyrexian = 0..=usize::MAX;
+    let mut num_any_color_split = 0..=usize::MAX;
+    let mut num_any_split_generic = 0..=usize::MAX;
+    let mut num_variables_used = 0..=usize::MAX;
+    let mut num_odd_edge_case_symbols = 0..=usize::MAX;
+
+    match field_querying {
+        0 => num_white = value_querying..=value_querying,
+        1 => num_blue = value_querying..=value_querying,
+        2 => num_black = value_querying..=value_querying,
+        3 => num_red = value_querying..=value_querying,
+        4 => num_green = value_querying..=value_querying,
+        5 => num_colorless = value_querying..=value_querying,
+        6 => num_generic = value_querying..=value_querying,
+        7 => num_any_phyrexian = value_querying..=value_querying,
+        8 => num_any_color_split = value_querying..=value_querying,
+        9 => num_any_split_generic = value_querying..=value_querying,
+        10 => num_variables_used = value_querying..=value_querying,
+        11 => num_odd_edge_case_symbols = value_querying..=value_querying,
+        _ => unreachable!()
+    }
+
+    ManaCostCount::Query {
+        num_white,
+        num_blue,
+        num_black,
+        num_red,
+        num_green,
+        num_colorless,
+        num_generic,
+        num_any_phyrexian,
+        num_any_split_generic,
+        num_any_color_split,
+        num_variables_used,
+        num_odd_edge_case_symbols,
+    }
 }
 
 fn make_color_combination_maybe(index: usize) -> ColorCombinationMaybe {

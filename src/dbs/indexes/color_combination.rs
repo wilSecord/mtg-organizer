@@ -1,6 +1,9 @@
-use minimal_storage::{serialize_fast::MinimalSerdeFast, serialize_min::{DeserializeFromMinimal, SerializeMinimal}};
+use minimal_storage::{
+    serialize_fast::MinimalSerdeFast,
+    serialize_min::{DeserializeFromMinimal, SerializeMinimal},
+};
 use ratatui::layout::Direction;
-use tree::tree_traits::{Dimension, MultidimensionalKey, MultidimensionalParent, Zero};
+use tree::tree_traits::{Dimension, MinValue, MultidimensionalKey, MultidimensionalParent, Zero};
 
 use crate::data_model::card::{Color, ColorCombination};
 
@@ -113,6 +116,15 @@ impl Dimension<6> for Color {
 impl MultidimensionalParent<6> for ColorCombinationMaybe {
     type DimensionEnum = Color;
 
+    const UNIVERSE: Self = ColorCombinationMaybe {
+        white: None,
+        blue: None,
+        black: None,
+        red: None,
+        green: None,
+        colorless: None,
+    };
+
     fn contains(&self, child: &Self) -> bool {
         (self.white.is_none() || self.white == child.white)
             && (self.blue.is_none() || self.blue == child.blue)
@@ -218,14 +230,14 @@ impl MultidimensionalKey<6> for ColorCombination {
         finl: &Self::DeltaFromParent,
         initil: &Self::DeltaFromParent,
     ) -> Self::DeltaFromSelfAsChild {
-        todo!()
+        finl.to_owned()
     }
 
     fn apply_delta_from_self(
         delta: &Self::DeltaFromSelfAsChild,
         initial: &Self::DeltaFromParent,
     ) -> Self::DeltaFromParent {
-        todo!()
+        delta.to_owned()
     }
 }
 
@@ -233,14 +245,14 @@ impl MinimalSerdeFast for ColorCombination {
     fn fast_minimally_serialize<'a, 's: 'a, W: std::io::Write>(
         &'a self,
         write_to: &mut W,
-        external_data: <Self as SerializeMinimal>::ExternalData<'s>,
+        _external_data: <Self as SerializeMinimal>::ExternalData<'s>,
     ) -> std::io::Result<()> {
         self.minimally_serialize(write_to, ())
     }
 
     fn fast_deserialize_minimal<'a, 'd: 'a, R: std::io::Read>(
         from: &'a mut R,
-        external_data: <Self as DeserializeFromMinimal>::ExternalData<'d>,
+        _external_data: <Self as DeserializeFromMinimal>::ExternalData<'d>,
     ) -> Result<Self, std::io::Error> {
         Self::deserialize_minimal(from, ())
     }
@@ -251,28 +263,13 @@ impl MinimalSerdeFast for ColorCombination {
     }
 }
 
-impl ColorCombination {
-    pub fn universal_parent() -> ColorCombinationMaybe {
-        ColorCombinationMaybe {
-            white: None,
-            blue: None,
-            black: None,
-            red: None,
-            green: None,
-            colorless: None,
-        }
-    }
-}
-
-impl Zero for ColorCombination {
-    fn zero() -> Self {
-        ColorCombination {
-            white: false,
-            blue: false,
-            black: false,
-            red: false,
-            green: false,
-            colorless: false,
-        }
-    }
+impl MinValue for ColorCombination {
+    const MIN: Self = ColorCombination {
+        white: false,
+        blue: false,
+        black: false,
+        red: false,
+        green: false,
+        colorless: false,
+    };
 }
