@@ -317,10 +317,10 @@ fn main() -> io::Result<()> {
 
     for (i, card) in cards_arr.into_iter().enumerate() {
         let card = parse_card(card);
-        if cards_already_seen.contains(&card) {
+        if cards_already_seen.contains(&card.name) {
             continue;
         } else {
-            cards_already_seen.insert(card.clone());
+            cards_already_seen.insert(card.name.clone());
         }
         let cardref = sets
             .get(&card.name)
