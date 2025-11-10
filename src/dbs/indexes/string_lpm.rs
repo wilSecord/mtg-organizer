@@ -288,7 +288,7 @@ impl StringPrefix {
         let s_str: &str = s.borrow();
 
         (&mut write[..])
-            .write_all(&s_str.as_bytes()[0..(write_len)])
+            .write_all(&s_str.as_bytes()[0..std::cmp::min(s_str.len(), write_len)])
             .unwrap();
 
         Self {
