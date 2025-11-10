@@ -1,5 +1,5 @@
 use std::{
-    num::{IntErrorKind, NonZero, ParseIntError},
+    num::{IntErrorKind, NonZero, NonZeroUsize, ParseIntError},
     str::FromStr,
 };
 
@@ -51,16 +51,31 @@ pub struct Card {
 /// can be a set value or can be controlled by some
 /// manner of game state (e.g. Plague Rats)
 /// Even if the value is technically fixed, if it's infinite or
-/// negative then it will be treated as dynamic.
-#[derive(Debug, Clone, PartialEq)]
-pub enum CardDynamicNumber {
-    Set(usize),
-    Dynamic,
+/// negative then it will be treated as dynamic. If it's set, then
+/// it has to be <=(USIZE::MAX - 1).
+///
+/// Represented in source by an Option<NonZeroUsize> for niche optimization.
+/// None represents a dynamic number; Some(n) represents the number (n - 1).
+#[derive(Debug, Clone, PartialEq, Eq, Copy)]
+pub struct CardDynamicNumber(Option<NonZeroUsize>);
+impl CardDynamicNumber {
+    pub fn as_repr_usize(&self) -> usize {
+        match self.0 {
+            Some(n) => n.get(),
+            None => 0,
+        }
+    }
+    pub fn from_repr_usize(u: usize) -> Self {
+        match u {
+            0 => Self(None),
+            _ => Self(Some(NonZeroUsize::new(u).unwrap())),
+        }
+    }
 }
 
 impl Default for CardDynamicNumber {
     fn default() -> Self {
-        Self::Dynamic
+        Self(None)
     }
 }
 
@@ -69,16 +84,17 @@ impl FromStr for CardDynamicNumber {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            "*" | "*+1" | "2+*" | "7-*" | "1+*" | "?" | "X" | "1d4+1" | "∞" | "-1" | "-0" | "1.5" | "3.5" | ".5" | "2.5" | "*²" => Ok(Self::Dynamic),
-            s => match s.parse() {
-                Ok(v) => Ok(Self::Set(v)),
+            "*" | "*+1" | "2+*" | "7-*" | "1+*" | "?" | "X" | "1d4+1" | "∞" | "-1" | "-0"
+            | "1.5" | "3.5" | ".5" | "2.5" | "*²" => Ok(Self(None)),
+            s => match s.parse::<usize>() {
+                Ok(v) => Ok(Self(Some(NonZeroUsize::new(v + 1).unwrap()))),
                 Err(e) => Err(e),
             },
         }
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Supertype {
     Basic,
     Legendary,
@@ -89,7 +105,7 @@ pub enum Supertype {
     Host,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Rarity {
     Common,
     Uncommon,

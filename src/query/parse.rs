@@ -193,5 +193,5 @@ fn test_parser() {
         "t:legendary (t:goblin or t:elf)",
     ] {
         dbg!(parse_str(src, DebugPrintMessages));
-    }   
+    }
 }

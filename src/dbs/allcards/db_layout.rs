@@ -2,7 +2,11 @@ use crate::{
     data_model::card::ColorCombination,
     dbs::{
         allcards::{Card, DBTree},
-        indexes::mana_cost::{self, ManaCostCount},
+        indexes::{
+            mana_cost::{self, ManaCostCount},
+            stats::card_stats,
+            string_lpm, string_trigram,
+        },
     },
 };
 use minimal_storage::{
@@ -14,6 +18,7 @@ use minimal_storage::{
 macro_rules! layout_all_cards_db {
     ( $($index_name:ident : $index_type:ty : $index_dim:literal dimensional $(,)? )* ) => {
         pub struct AllCardsDbLayout {
+            pub num_cards: usize,
             pub cards_page: PageId<{ tree::PAGE_SIZE }>,
 
             $( pub $index_name: PageId<{ tree::PAGE_SIZE }>, )*
@@ -27,6 +32,7 @@ macro_rules! layout_all_cards_db {
                 write_to: &mut W,
                 _external_data: Self::ExternalData<'s>,
             ) -> std::io::Result<()> {
+                self.num_cards.minimally_serialize(write_to, ())?;
                 self.cards_page.minimally_serialize(write_to, ())?;
 
                 $( self.$index_name.minimally_serialize(write_to, ())?; )*
@@ -42,17 +48,20 @@ macro_rules! layout_all_cards_db {
                 from: &'a mut R,
                 _external_data: Self::ExternalData<'d>,
             ) -> Result<Self, std::io::Error> {
+                let num_cards = usize::deserialize_minimal(from, ())?;
                 let cards_page = PageId::deserialize_minimal(from, ())?;
 
                 $( let $index_name = PageId::deserialize_minimal(from, ())?; )*
 
                 Ok(Self {
+                    num_cards,
                     cards_page,
                     $($index_name),*
                 })
             }
         }
         pub struct AllCardsDb {
+            pub(super) num_cards: std::sync::atomic::AtomicUsize,
             pub(super) cards: DBTree<1, u128, Card>,
 
             $( pub(super) $index_name: DBTree<$index_dim, $index_type, u128>, )*
@@ -72,7 +81,11 @@ macro_rules! layout_all_cards_db {
 
                 $( let $index_name = tree::sparse::open_storage(<$index_type as tree::tree_traits::MultidimensionalKey<$index_dim>>::Parent::UNIVERSE, storage, Some(layout_read.$index_name)); )*
 
-                Ok(AllCardsDb { cards, $( $index_name, )* })
+                Ok(AllCardsDb {
+                    num_cards: layout_read.num_cards.into(),
+                    cards,
+                    $( $index_name, )*
+                })
             }
             None => {
                 let mut db_swap = None::<AllCardsDb>;
@@ -89,9 +102,17 @@ macro_rules! layout_all_cards_db {
                         $index_name.1 = $index_name.0.root_page_id();
                     )*
 
-                    db_swap = Some(AllCardsDb { cards, $( $index_name: $index_name.0, )* });
+                    db_swap = Some(AllCardsDb {
+                        num_cards: 0.into(),
+                        cards,
+                        $( $index_name: $index_name.0, )*
+                    });
 
-                    AllCardsDbLayout { cards_page, $( $index_name: $index_name.1, )* }
+                    AllCardsDbLayout {
+                        num_cards: 0,
+                        cards_page,
+                        $( $index_name: $index_name.1, )*
+                    }
                 });
 
                 debug_assert_eq!(layout_id, known_layout_page_id);
@@ -107,6 +128,7 @@ layout_all_cards_db! {
     color: ColorCombination: 6 dimensional,
     color_id: ColorCombination:  6 dimensional,
     mana_cost: ManaCostCount::Key: 12 dimensional,
-    //todo: implement indexes for supertypes,
-    //float (mana_value), rarity
+    fulltext: string_trigram::trigram::Key: 2 dimensional,
+    types: string_lpm::StringLongestPrefix: 1 dimensional,
+    stats: card_stats::Key: 6 dimensional,
 }

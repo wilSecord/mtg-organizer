@@ -1,6 +1,9 @@
 use tree::tree_traits::{MultidimensionalKey, MultidimensionalParent};
 
-use crate::{data_model::card, dbs::indexes::{helpers::make_index_types, mana_cost::ManaCostCount::Query}};
+use crate::{
+    data_model::card,
+    dbs::indexes::{helpers::make_index_types, mana_cost::ManaCostCount::Query},
+};
 
 make_index_types! {
     key ManaCostCount {
@@ -25,7 +28,7 @@ make_index_types! {
 
 impl ManaCostCount::Key {
     pub fn new(cost: &card::ManaCost) -> Self {
-        let mut slf = Self::default();
+        let mut slf = Self::smallest_key_in(&ManaCostCount::Query::UNIVERSE);
 
         for symbol in &cost.0 {
             match symbol {
@@ -65,11 +68,9 @@ impl ManaCostCount::Key {
                         card::Color::Green => slf.num_green += 1,
                         card::Color::Colorless => slf.num_colorless += 1,
                     }
-                },
+                }
             }
         }
-
-        dbg!(slf);
 
         debug_assert!(slf.is_contained_in(&ManaCostCount::Query::UNIVERSE));
 

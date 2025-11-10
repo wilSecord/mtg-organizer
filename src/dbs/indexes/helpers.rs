@@ -9,13 +9,26 @@ macro_rules! first {
     ( $h:ident $($t:ident)* ) => {
         $h
     };
-    () => { }
+    () => {};
+}
+
+macro_rules! if_empty_else {
+    ($true:tt $false:tt) => {
+        $true
+    };
+    ($i:ident $true:tt $false:tt) => {
+        $false
+    }
+
 }
 
 macro_rules! make_index_types {
-    ( 
+    (
         key $keyname:ident {
-            $( $fieldname:ident : $fieldtype:ty $(,)? )*
+            $( 
+                $(#[$serde_kind:ident])?
+                $fieldname:ident: $fieldtype:ty $(,)? 
+            )*
         }
     ) => {
         #[allow(non_snake_case)]
@@ -24,8 +37,8 @@ macro_rules! make_index_types {
             use minimal_storage::serialize_fast::MinimalSerdeFast;
 
             const DIMENSIONS: usize = $crate::dbs::indexes::helpers::count!( $( $fieldname )* );
-            
-            #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+
+            #[derive(Debug, Clone, Copy, PartialEq, Eq)]
             pub struct Key {
                 $( pub $fieldname : $fieldtype, )*
             }
@@ -36,8 +49,8 @@ macro_rules! make_index_types {
             }
             impl std::cmp::Ord for Key {
                 fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-                    $( 
-                        let $fieldname = self.$fieldname.cmp(&other.$fieldname); 
+                    $(
+                        let $fieldname = self.$fieldname.cmp(&other.$fieldname);
                         if $fieldname != std::cmp::Ordering::Equal {
                             return $fieldname;
                         }
@@ -56,7 +69,7 @@ macro_rules! make_index_types {
                 type DeltaFromSelfAsChild = Self;
 
                 fn is_contained_in(&self, parent: &Self::Parent) -> bool {
-                    true 
+                    true
                     $( && self.$fieldname.is_contained_in(&parent.$fieldname) )*
                 }
                 fn delta_from_parent(&self, _parent: &Self::Parent) -> Self::DeltaFromParent {
@@ -122,18 +135,36 @@ macro_rules! make_index_types {
                     write_to: &mut W,
                     _external_data: <Self as SerializeMinimal>::ExternalData<'s>,
                 ) -> std::io::Result<()> {
-                    self.minimally_serialize(write_to, ())
+                    $(
+                        $crate::dbs::indexes::helpers::if_empty_else!($($serde_kind)? {
+                            self.$fieldname.minimally_serialize(write_to, ())?
+                        } {
+                            self.$fieldname.fast_minimally_serialize(write_to, ())?
+                        });
+                    )*
+                    
+                    Ok(())
                 }
 
                 fn fast_deserialize_minimal<'a, 'd: 'a, R: std::io::Read>(
                     from: &'a mut R,
                     _external_data: <Self as DeserializeFromMinimal>::ExternalData<'d>,
                 ) -> Result<Self, std::io::Error> {
-                    Self::deserialize_minimal(from, ())
+                    $(
+                        let $fieldname = $crate::dbs::indexes::helpers::if_empty_else!($($serde_kind)? {
+                            <$fieldtype>::deserialize_minimal(from, ())?
+                        } {
+                            <$fieldtype>::fast_deserialize_minimal(from, ())?
+                        });
+                    )*
+
+                    Ok(Self {
+                        $( $fieldname, )*
+                    })
                 }
 
                 fn fast_seek_after<R: std::io::Read>(from: &mut R) -> std::io::Result<()> {
-                    //reads exactly 1 byte to skip past this one
+                    
                     Self::fast_deserialize_minimal(from, ()).map(|_| ())
                 }
             }
@@ -187,7 +218,7 @@ macro_rules! make_index_types {
                     //[1]: https://doc.rust-lang.org/reference/items/enumerations.html#r-items.enum.discriminant.implicit
                     unsafe { std::mem::transmute(safe_idx) }
                 }
-                fn arbitrary_first() -> Self { 
+                fn arbitrary_first() -> Self {
                     use Dim::*;
                     $crate::dbs::indexes::helpers::first!( $( $fieldname )* )
                 }
@@ -225,9 +256,10 @@ macro_rules! make_index_types {
                 }
             }
         }
-        
+
     };
 }
 pub(crate) use count;
-pub(crate) use make_index_types;
 pub(crate) use first;
+pub(crate) use if_empty_else;
+pub(crate) use make_index_types;

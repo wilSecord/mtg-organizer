@@ -315,7 +315,7 @@ fn main() -> io::Result<()> {
             .expect(&format!("'{}' must have a collector's number", card.name));
         db.add(cardref, card);
 
-        eprintln!("{i}/{card_last_idx}");
+        eprint!("{i}/{card_last_idx} \u{1b}[0E");
     }
 
     Ok(())

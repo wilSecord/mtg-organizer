@@ -1,4 +1,4 @@
-use std::io::ErrorKind;
+use std::{io::ErrorKind, num::NonZeroUsize};
 
 use minimal_storage::{
     bit_sections::{self, BitSection, Byte},
@@ -282,10 +282,8 @@ impl DeserializeFromMinimal for CardDynamicNumber {
         from: &'a mut R,
         _: Self::ExternalData<'d>,
     ) -> Result<Self, std::io::Error> {
-        match usize::deserialize_minimal(from, ())? {
-            0 => Ok(CardDynamicNumber::Dynamic),
-            n => Ok(CardDynamicNumber::Set(n - 1)),
-        }
+        usize::deserialize_minimal(from, ()).map(Self::from_repr_usize)
+
     }
 }
 
@@ -297,13 +295,7 @@ impl SerializeMinimal for CardDynamicNumber {
         write_to: &mut W,
         _: Self::ExternalData<'s>,
     ) -> std::io::Result<()> {
-        match self {
-            CardDynamicNumber::Set(set_number) => set_number
-                .checked_add(1)
-                .unwrap()
-                .minimally_serialize(write_to, ()),
-            CardDynamicNumber::Dynamic => 0usize.minimally_serialize(write_to, ()),
-        }
+        self.as_repr_usize().minimally_serialize(write_to, ())
     }
 }
 
