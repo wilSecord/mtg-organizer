@@ -60,6 +60,7 @@ impl AllCardsDb {
         db_layout::initialize_or_deserialize_db_layout(&storage)
     }
 
+
     pub fn query_type<'a>(
         &'a self,
         q: &'a LongestPrefixMatch,

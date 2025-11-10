@@ -26,11 +26,15 @@ pub struct PhysicalCard {
     pub duplicates: usize,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Card {
     pub name: String,
     pub mana_cost: ManaCost,
-    pub mana_value: f64,
+    /// This is multiplied by 4 because 
+    /// of cards with non-integer mana values.
+    /// Currently, only cards with .5 mana values
+    /// exist, but tokens can be created with .25
+    pub mana_value_times_4: usize,
     pub color: ColorCombination,
     pub color_id: ColorCombination,
     pub super_types: Vec<Supertype>,
@@ -56,7 +60,7 @@ pub struct Card {
 ///
 /// Represented in source by an Option<NonZeroUsize> for niche optimization.
 /// None represents a dynamic number; Some(n) represents the number (n - 1).
-#[derive(Debug, Clone, PartialEq, Eq, Copy)]
+#[derive(Debug, Clone, PartialEq, Eq, Copy, Hash)]
 pub struct CardDynamicNumber(Option<NonZeroUsize>);
 impl CardDynamicNumber {
     pub fn as_repr_usize(&self) -> usize {
@@ -94,7 +98,7 @@ impl FromStr for CardDynamicNumber {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Supertype {
     Basic,
     Legendary,
@@ -105,7 +109,7 @@ pub enum Supertype {
     Host,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Rarity {
     Common,
     Uncommon,
@@ -114,7 +118,7 @@ pub enum Rarity {
     Special,
 }
 
-#[derive(Debug, Clone, Copy, Default, PartialEq, PartialOrd, Eq, Ord)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, PartialOrd, Eq, Ord, Hash)]
 pub struct ColorCombination {
     pub white: bool,
     pub blue: bool,
@@ -124,7 +128,7 @@ pub struct ColorCombination {
     pub colorless: bool,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Hash)]
 pub enum NormalManaSymbol {
     White,
     Blue,
@@ -135,10 +139,10 @@ pub enum NormalManaSymbol {
     Colorless,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ManaCost(pub Vec<ManaSymbol>);
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Color {
     White,
     Blue,
@@ -148,13 +152,13 @@ pub enum Color {
     Colorless,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ManaVariable {
     X,
     Y,
     Z,
 }
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum ManaSymbol {
     Variable(ManaVariable),
     GenericNumber(usize),

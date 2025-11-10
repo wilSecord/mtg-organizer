@@ -6,7 +6,7 @@ use project::data_model::card::{
 use project::dbs::allcards::AllCardsDb;
 use project::dbs::allcards::cardref_key::card_ref_to_index;
 use serde_json;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::fs::File;
 use std::io::{self, BufRead, BufReader};
 use std::str::FromStr;
@@ -43,10 +43,12 @@ fn parse_card(card: serde_json::Value) -> Card {
                 .as_str()
                 .expect("Mana cost should be a string"),
         ),
-        mana_value: card["mana_value"]
+        mana_value_times_4: card["mana_value"]
             .as_str()
-            .and_then(|x| x.parse().ok())
-            .expect("MVs should be a float encoded as a string"),
+            .and_then(|x| x.parse::<f64>().ok())
+            .filter(|x| (x * 4.0).fract() == 0.0)
+            .map(|x| (x * 4.0) as usize)
+            .expect("MVs should be a float encoded as a string, and no less than .25"),
         color: parse_color_combination(card["color"].as_str().expect("Bad Color Combo")),
         color_id: parse_color_combination(card["color_id"].as_str().expect("Bad Color Combo")),
         super_types: card["super_types"]
@@ -294,6 +296,9 @@ fn main() -> io::Result<()> {
     let json_cards: serde_json::Value =
         serde_json::from_reader(rdr).expect("Bad data in <cards_file>");
 
+    //try to remove the old database. no sweat if it doesn't work.
+    let _ = std::fs::remove_file(&db_file);
+
     let db = AllCardsDb::open(db_file).expect("Could not open <db_file>");
 
     let cards_arr = match json_cards {
@@ -308,8 +313,15 @@ fn main() -> io::Result<()> {
 
     let card_last_idx = cards_arr.len() - 1;
 
+    let mut cards_already_seen = HashSet::new();
+
     for (i, card) in cards_arr.into_iter().enumerate() {
         let card = parse_card(card);
+        if cards_already_seen.contains(&card) {
+            continue;
+        } else {
+            cards_already_seen.insert(card.clone());
+        }
         let cardref = sets
             .get(&card.name)
             .expect(&format!("'{}' must have a collector's number", card.name));

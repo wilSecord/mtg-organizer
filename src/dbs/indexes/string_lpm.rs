@@ -11,7 +11,7 @@ use tree::{
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub struct LongestPrefixMatch {
-    bitlen: usize,
+    bitlen: u8,
     bitbuf: u128,
 }
 
@@ -37,7 +37,7 @@ impl std::fmt::Debug for LongestPrefixMatch {
         s.field("bitbuf", &self.bitbuf);
 
         let buf_bytes = self.bitbuf.to_be_bytes();
-        if let Ok(as_str) = str::from_utf8(&buf_bytes[..(self.bitlen / 8)]) {
+        if let Ok(as_str) = str::from_utf8(&buf_bytes[..(self.bitlen as usize / 8)]) {
             s.field("[as str]", &as_str);
         }
 
@@ -129,7 +129,7 @@ impl MinimalSerdeFast for LongestPrefixMatch {
             return Ok(());
         }
 
-        let shift = u128::BITS as usize - self.bitlen;
+        let shift = u128::BITS as u8 - self.bitlen;
 
         debug_assert_eq!(self.bitbuf, (self.bitbuf >> shift) << shift);
 
@@ -140,14 +140,14 @@ impl MinimalSerdeFast for LongestPrefixMatch {
         from: &'a mut R,
         _external_data: <Self as minimal_storage::serialize_min::DeserializeFromMinimal>::ExternalData<'d>,
     ) -> Result<Self, std::io::Error> {
-        let bitlen = usize::deserialize_minimal(from, ())?;
+        let bitlen = u8::deserialize_minimal(from, ())?;
 
         if bitlen == 0 {
             return Ok(Self { bitlen, bitbuf: 0 });
         }
 
         let mut bitbuf = u128::deserialize_minimal(from, ())?;
-        let shift = u128::BITS as usize - bitlen;
+        let shift = u128::BITS as u8 - bitlen;
 
         bitbuf <<= shift;
 
@@ -181,7 +181,7 @@ impl MultidimensionalParent<1> for LongestPrefixMatch {
             return true;
         }
 
-        let shift = u128::BITS as usize - self.bitlen;
+        let shift = u128::BITS as u8 - self.bitlen;
 
         (child.bitbuf >> shift) == (self.bitbuf >> shift)
     }
@@ -214,7 +214,7 @@ impl MultidimensionalKey<1> for StringPrefix {
             return true;
         }
 
-        let shift = u128::BITS as usize - parent.bitlen;
+        let shift = u128::BITS as u8 - parent.bitlen;
 
         (self.s >> shift) == (parent.bitbuf >> shift)
     }
@@ -318,7 +318,7 @@ impl LongestPrefixMatch {
 
         Ok(Self {
             bitbuf: u128::from_be_bytes(write.try_into().unwrap()),
-            bitlen: s_bytes.len() * 8,
+            bitlen: s_bytes.len() as u8 * 8,
         })
     }
 

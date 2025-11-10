@@ -28,7 +28,7 @@ impl card_stats::Key {
             loyalty: card.loyalty.as_repr_usize(),
             defense: card.defense + 1,
             game_changer: card.game_changer as u8,
-            mana_value_quarters: (card.mana_value * 4.0) as usize,
+            mana_value_quarters: card.mana_value_times_4,
         }
     }
 }

@@ -51,7 +51,7 @@ impl DeserializeFromMinimal for Card {
         };
         let name = String::deserialize_minimal(from, Some(name_fb))?;
 
-        let mana_value = usize::deserialize_minimal(from, ())? as f64 / 4.0;
+        let mana_value_times_4 = usize::deserialize_minimal(from, ())?;
 
         let mana_cost = ManaCost::deserialize_minimal(from, ())?;
 
@@ -77,7 +77,7 @@ impl DeserializeFromMinimal for Card {
         Ok(Card {
             name,
             mana_cost,
-            mana_value,
+            mana_value_times_4,
             color,
             color_id,
             super_types,
@@ -117,11 +117,7 @@ impl SerializeMinimal for Card {
             .as_str()
             .minimally_serialize(write_to, BitSection::from(rarity << 5))?;
 
-        //there should, AT LEAST, be quarter-mana. provided WotC doesn't do
-        //something horrible
-        let mana_value_int = self.mana_value * 4.0;
-        debug_assert!(mana_value_int.fract() == 0.0);
-        (mana_value_int as usize).minimally_serialize(write_to, ())?;
+        self.mana_value_times_4.minimally_serialize(write_to, ())?;
         self.mana_cost.minimally_serialize(write_to, ())?;
 
         self.color.minimally_serialize(write_to, ())?;
