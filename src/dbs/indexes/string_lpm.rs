@@ -302,6 +302,9 @@ impl LongestPrefixMatch {
 
     fn push_bit(&mut self, new_bit_value: bool) {
         self.bitlen += 1;
+        if self.bitlen >= 128 {
+            self.bitlen = 128;
+        }
         self.bitbuf |= (new_bit_value as u128) << (128 - self.bitlen);
     }
     pub fn new<S: std::borrow::Borrow<str>>(s: S) -> Result<Self, StringTooLongErr> {
