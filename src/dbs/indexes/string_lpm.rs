@@ -1,4 +1,4 @@
-use std::{borrow::Cow, cmp::Ordering, fmt::Debug, io::Write};
+use std::{borrow::Cow, cmp::Ordering, fmt::Debug, io::Write, u128};
 
 use minimal_storage::{
     serialize_fast::MinimalSerdeFast,
@@ -6,7 +6,7 @@ use minimal_storage::{
 };
 use tree::{
     sparse::SparseKey,
-    tree_traits::{MinValue, MultidimensionalKey, MultidimensionalParent, Zero},
+    tree_traits::{MaxValue, MinValue, MultidimensionalKey, MultidimensionalParent, Zero},
 };
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -25,14 +25,13 @@ impl std::fmt::Debug for StringPrefix {
         f
             .debug_struct("StringPrefix")
             .field("s", &self.s)
-            
-            f.finish()
+            .finish()
     }
 }
 
 impl std::fmt::Debug for LongestPrefixMatch {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let mut s = f.debug_struct("StringLongestPrefix");
+        let mut s = f.debug_struct("LongestPrefixMatch");
 
         s.field("bitlen", &self.bitlen);
         s.field("bitbuf", &self.bitbuf);
@@ -46,7 +45,7 @@ impl std::fmt::Debug for LongestPrefixMatch {
     }
 }
 
-impl DeserializeFromMinimal for StringLongestPrefix {
+impl DeserializeFromMinimal for StringPrefix {
     type ExternalData<'d> = ();
 
     fn deserialize_minimal<'a, 'd: 'a, R: std::io::Read>(
@@ -57,7 +56,7 @@ impl DeserializeFromMinimal for StringLongestPrefix {
     }
 }
 
-impl SerializeMinimal for StringLongestPrefix {
+impl SerializeMinimal for StringPrefix {
     type ExternalData<'s> = ();
 
     fn minimally_serialize<'a, 's: 'a, W: std::io::Write>(
@@ -69,7 +68,53 @@ impl SerializeMinimal for StringLongestPrefix {
     }
 }
 
-impl MinimalSerdeFast for StringLongestPrefix {
+impl DeserializeFromMinimal for LongestPrefixMatch {
+    type ExternalData<'d> = ();
+
+    fn deserialize_minimal<'a, 'd: 'a, R: std::io::Read>(
+        from: &'a mut R,
+        external_data: Self::ExternalData<'d>,
+    ) -> Result<Self, std::io::Error> {
+        Self::fast_deserialize_minimal(from, external_data)
+    }
+}
+
+impl SerializeMinimal for LongestPrefixMatch {
+    type ExternalData<'s> = ();
+
+    fn minimally_serialize<'a, 's: 'a, W: std::io::Write>(
+        &'a self,
+        write_to: &mut W,
+        external_data: Self::ExternalData<'s>,
+    ) -> std::io::Result<()> {
+        self.fast_minimally_serialize(write_to, external_data)
+    }
+}
+
+impl MinimalSerdeFast for StringPrefix {
+    fn fast_minimally_serialize<'a, 's: 'a, W: std::io::Write>(
+        &'a self,
+        write_to: &mut W,
+        _external_data: <Self as SerializeMinimal>::ExternalData<'s>,
+    ) -> std::io::Result<()> {
+        self.s.fast_minimally_serialize(write_to, ())
+    }
+
+    fn fast_deserialize_minimal<'a, 'd: 'a, R: std::io::Read>(
+        from: &'a mut R,
+        _external_data: <Self as minimal_storage::serialize_min::DeserializeFromMinimal>::ExternalData<'d>,
+    ) -> Result<Self, std::io::Error> {
+        u128::fast_deserialize_minimal(from, ()).map(|s| Self { s })
+    }
+
+    fn fast_seek_after<R: std::io::Read>(from: &mut R) -> std::io::Result<()> {
+        u128::fast_seek_after(from)
+    }
+}
+
+
+
+impl MinimalSerdeFast for LongestPrefixMatch {
     fn fast_minimally_serialize<'a, 's: 'a, W: std::io::Write>(
         &'a self,
         write_to: &mut W,
@@ -125,7 +170,20 @@ impl MultidimensionalParent<1> for LongestPrefixMatch {
     };
 
     fn contains(&self, child: &Self) -> bool {
-        child.is_contained_in(self)
+        //if the parent is more specific, then we're not inside it.
+        if self.bitlen > child.bitlen {
+            return false;
+        }
+
+        //if the parent's length is 0, then it would be
+        //an overflow on shifting. just autoreturn true.
+        if self.bitlen == 0 {
+            return true;
+        }
+
+        let shift = u128::BITS as usize - self.bitlen;
+
+        (child.bitbuf >> shift) == (self.bitbuf >> shift)
     }
 
     fn overlaps(&self, child: &Self) -> bool {
@@ -145,16 +203,11 @@ impl MultidimensionalParent<1> for LongestPrefixMatch {
 impl MultidimensionalKey<1> for StringPrefix {
     type Parent = LongestPrefixMatch;
 
-    type DeltaFromParent = Self;
+    type DeltaFromParent = u128;
 
-    type DeltaFromSelfAsChild = Self;
+    type DeltaFromSelfAsChild = u128;
 
     fn is_contained_in(&self, parent: &Self::Parent) -> bool {
-        //if the parent is more specific, then we're not inside it.
-        if parent.bitlen > self.bitlen {
-            return false;
-        }
-
         //if the parent's length is 0, then it would be
         //an overflow on shifting. just autoreturn true.
         if parent.bitlen == 0 {
@@ -163,50 +216,57 @@ impl MultidimensionalKey<1> for StringPrefix {
 
         let shift = u128::BITS as usize - parent.bitlen;
 
-        (self.bitbuf >> shift) == (parent.bitbuf >> shift)
+        (self.s >> shift) == (parent.bitbuf >> shift)
     }
 
     fn delta_from_parent(&self, parent: &Self::Parent) -> Self::DeltaFromParent {
-        let delta_len = self.bitlen - parent.bitlen;
-        let delta_amnt = parent.bitbuf ^ self.bitbuf;
+        let delta_amnt = parent.bitbuf ^ self.s;
 
-        Self {
-            bitlen: delta_len,
-            bitbuf: delta_amnt,
-        }
+        delta_amnt
     }
 
     fn apply_delta_from_parent(delta: &Self::DeltaFromParent, parent: &Self::Parent) -> Self {
         Self {
-            bitlen: delta.bitlen + parent.bitlen,
-            bitbuf: delta.bitbuf | parent.bitbuf,
+            s: delta | parent.bitbuf
         }
     }
 
     fn smallest_key_in(parent: &Self::Parent) -> Self {
-        let mut sk = parent.to_owned();
-        sk.push_bit(false);
-        sk
+        let shift = 128 - parent.bitlen;
+        if shift == 128 {
+            return Self { s: 0 };
+        }
+
+        let s = (parent.bitbuf >> shift) << shift;
+
+        Self { s }
     }
 
     fn largest_key_in(parent: &Self::Parent) -> Self {
-        let mut sk = parent.to_owned();
-        sk.push_bit(true);
-        sk
+        let shift = 128 - parent.bitlen;
+        if shift == 128 {
+            return Self { s: u128::MAX };
+        }
+
+        let mask = ((!0u128) >> shift) << shift;
+
+        let s = parent.bitbuf | mask;
+
+        Self { s }
     }
 
     fn delta_from_self(
         finl: &Self::DeltaFromParent,
         initil: &Self::DeltaFromParent,
     ) -> Self::DeltaFromSelfAsChild {
-        Self::delta_from_parent(finl, initil)
+        finl - initil
     }
 
     fn apply_delta_from_self(
         delta: &Self::DeltaFromSelfAsChild,
         initial: &Self::DeltaFromParent,
     ) -> Self::DeltaFromParent {
-        Self::apply_delta_from_parent(delta, initial)
+        initial + delta
     }
 }
 
@@ -220,7 +280,24 @@ impl Debug for StringTooLongErr {
     }
 }
 
-impl StringLongestPrefix {
+impl StringPrefix {
+    pub fn new_prefix<S: std::borrow::Borrow<str>>(s: S) -> Self {
+        let mut write = vec![0; u128::BITS as usize / 8];
+        let write_len = write.len();
+
+        let s_str: &str = s.borrow();
+
+        (&mut write[..])
+            .write_all(&s_str.as_bytes()[0..(write_len)])
+            .unwrap();
+
+        Self {
+            s: u128::from_be_bytes(write.try_into().unwrap())
+        }
+    }
+}
+
+impl LongestPrefixMatch {
     const MAX_BYTES: usize = u128::BITS as usize / 8;
 
     fn push_bit(&mut self, new_bit_value: bool) {
@@ -256,24 +333,21 @@ impl StringLongestPrefix {
     }
 }
 
-impl MinValue for StringLongestPrefix {
+impl MinValue for StringPrefix {
     const MIN: Self = Self {
-        bitlen: 0,
-        bitbuf: 0,
+        s: u128::MIN
     };
 }
-impl MaxValue for StringLongestPrefix {
+impl MaxValue for StringPrefix {
     const MAX: Self = Self {
-        bitlen: 0,
-        bitbuf: 1,
+        s: u128::MAX
     };
 }
 
-impl Default for StringLongestPrefix {
+impl Default for StringPrefix {
     fn default() -> Self {
         Self {
-            bitlen: 0,
-            bitbuf: 0,
+            s: 0
         }
     }
 }
@@ -282,59 +356,59 @@ impl Default for StringLongestPrefix {
 mod test {
     use tree::tree_traits::{MultidimensionalKey, MultidimensionalParent};
 
-    use crate::dbs::indexes::string_lpm::StringLongestPrefix;
+    use crate::dbs::indexes::string_lpm::{LongestPrefixMatch, StringPrefix};
 
     #[test]
     fn anything_inside_universe() {
         assert!(
-            StringLongestPrefix::new_prefix("Hello!")
-                .is_contained_in(&StringLongestPrefix::UNIVERSE)
+            StringPrefix::new_prefix("Hello!")
+                .is_contained_in(&LongestPrefixMatch::UNIVERSE)
         );
         assert!(
-            StringLongestPrefix::new_prefix("Apes").is_contained_in(&StringLongestPrefix::UNIVERSE)
+            StringPrefix::new_prefix("Apes").is_contained_in(&LongestPrefixMatch::UNIVERSE)
         );
         assert!(
-            StringLongestPrefix::new_prefix("").is_contained_in(&StringLongestPrefix::UNIVERSE)
+            StringPrefix::new_prefix("").is_contained_in(&LongestPrefixMatch::UNIVERSE)
         );
     }
 
     #[test]
     fn inside_prefix() {
         assert!(
-            StringLongestPrefix::new_prefix("state")
-                .is_contained_in(&StringLongestPrefix::new_prefix("s"))
+            StringPrefix::new_prefix("state")
+                .is_contained_in(&LongestPrefixMatch::new_prefix("s"))
         );
         assert!(
-            !StringLongestPrefix::new_prefix("tate")
-                .is_contained_in(&StringLongestPrefix::new_prefix("s"))
+            !StringPrefix::new_prefix("tate")
+                .is_contained_in(&LongestPrefixMatch::new_prefix("s"))
         );
 
         assert!(
-            StringLongestPrefix::new_prefix("PORK!! MY FAVOURITE")
-                .is_contained_in(&StringLongestPrefix::new_prefix("PORK!!"))
+            StringPrefix::new_prefix("PORK!! MY FAVOURITE")
+                .is_contained_in(&LongestPrefixMatch::new_prefix("PORK!!"))
         );
         assert!(
-            StringLongestPrefix::new_prefix("BETRAYAL OF THE FOREMOST KIND").is_contained_in(
-                &StringLongestPrefix::new_prefix("BETRAYAL OF THE FOREMOST KIND")
+            StringPrefix::new_prefix("BETRAYAL OF THE FOREMOST KIND").is_contained_in(
+                &LongestPrefixMatch::new_prefix("BETRAYAL OF THE FOREMOST KIND")
             )
         );
 
         //we can't tell after 16 chars
         assert!(
-            StringLongestPrefix::new_prefix("BETRAYAL OF THE FOREMOST KIND").is_contained_in(
-                &StringLongestPrefix::new_prefix("BETRAYAL OF THE WORST KIND")
+            StringPrefix::new_prefix("BETRAYAL OF THE FOREMOST KIND").is_contained_in(
+                &LongestPrefixMatch::new_prefix("BETRAYAL OF THE WORST KIND")
             )
         );
     }
 
     #[test]
     fn splitting() {
-        let a = StringLongestPrefix::UNIVERSE
+        let a = LongestPrefixMatch::UNIVERSE
             .split_evenly_on_dimension(&())
             .1;
         assert_eq!(
             a,
-            StringLongestPrefix {
+            LongestPrefixMatch {
                 bitlen: 1,
                 bitbuf: 1 << 127
             }
@@ -344,7 +418,7 @@ mod test {
 
         assert_eq!(
             b,
-            StringLongestPrefix {
+            LongestPrefixMatch {
                 bitlen: 2,
                 bitbuf: 0b10 << 126
             }
@@ -354,7 +428,7 @@ mod test {
 
         assert_eq!(
             c,
-            StringLongestPrefix {
+            LongestPrefixMatch {
                 bitlen: 3,
                 bitbuf: 0b101 << 125
             }

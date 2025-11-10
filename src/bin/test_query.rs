@@ -32,7 +32,7 @@ fn main() -> io::Result<()> {
     let start = Instant::now();
 
     for i in 0..TESTS {
-        let query = StringLongestPrefix::new_prefix(make_type_query(i));
+        let query = LongestPrefixMatch::new_prefix(make_type_query(i));
         total_found += db.query_type(&query).count();
     }
 

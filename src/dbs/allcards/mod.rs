@@ -22,7 +22,7 @@ use crate::{
             color_combination::ColorCombinationMaybe,
             mana_cost::ManaCostCount,
             stats::card_stats,
-            string_lpm::StringLongestPrefix,
+            string_lpm::{LongestPrefixMatch, StringPrefix},
             string_trigram::{string_trigrams, trigram},
         },
     },
@@ -62,7 +62,7 @@ impl AllCardsDb {
 
     pub fn query_type<'a>(
         &'a self,
-        q: &'a StringLongestPrefix,
+        q: &'a LongestPrefixMatch,
     ) -> impl Iterator<Item = impl AsRef<Card> + 'a> + 'a {
         self.types
             .find_entries_in_box(&q)
@@ -173,12 +173,12 @@ impl AllCardsDb {
         }
 
         for typ in card.types.iter() {
-            let pkey = StringLongestPrefix::new_prefix(typ.as_str().to_ascii_lowercase());
+            let pkey = StringPrefix::new_prefix(typ.as_str().to_ascii_lowercase());
             self.types.insert(pkey, id);
         }
 
         for typ in card.subtypes.iter() {
-            let pkey = StringLongestPrefix::new_prefix(typ.as_str().to_ascii_lowercase());
+            let pkey = StringPrefix::new_prefix(typ.as_str().to_ascii_lowercase());
             self.types.insert(pkey, id);
         }
 
