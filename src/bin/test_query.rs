@@ -7,7 +7,7 @@ use project::dbs::allcards::AllCardsDb;
 use project::dbs::allcards::cardref_key::card_ref_to_index;
 use project::dbs::indexes::color_combination::ColorCombinationMaybe;
 use project::dbs::indexes::mana_cost::ManaCostCount;
-use project::dbs::indexes::string_lpm::StringLongestPrefix;
+use project::dbs::indexes::string_lpm::LongestPrefixMatch;
 use serde_json;
 use tree::tree_traits::MultidimensionalParent;
 use std::collections::BTreeMap;
