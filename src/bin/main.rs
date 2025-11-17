@@ -1,18 +1,18 @@
+use std::any::type_name;
 use std::io::{self, BufRead, BufReader};
 use std::fs::{File, read_to_string};
 use serde_json;
 use nucleo_matcher::pattern::{Normalization, CaseMatching, Pattern};
 use nucleo_matcher::{Matcher, Config};
 use crossterm::event::{self, Event, KeyCode, KeyEventKind};
-use ratatui::{
-    layout::{Constraint, Direction, Layout},
-    style::{Color, Style},
+use ratatui::{ layout::{Constraint, Direction, Layout}, style::{Color, Style},
     text::{Line, Text},
     widgets::{Block, Paragraph},
     DefaultTerminal, Frame,
 };
 
-use project::data_model::card;
+use project::dbs::allcards::AllCardsDb;
+use project::query;
 
 
 enum InputMode {
@@ -47,11 +47,10 @@ impl App {
 
         // TEMP
         // TEMP
-        let file_path = "cards.txt"; 
-    
-        let file = File::open(file_path).expect("File not found.");
-        let buf = BufReader::new(file);
-        self.contents = buf.lines().map(|l| l.expect("Could not parse")).collect();
+        let db_file = "/home/wil/Documents/school/software/project/db";
+        let db = AllCardsDb::open(db_file)?;       
+        self.contents = db.all_cards().map(|x| x.name).collect::<Vec<_>>();
+
         // TEMP
         // TEMP
 
@@ -108,7 +107,7 @@ impl App {
         let help_msg = Paragraph::new(text);
         
         // Results area
-        let body = Paragraph::new("test").block(Block::bordered().title("Results"));
+        let body = Paragraph::new(self.results.join("\n")).block(Block::bordered().title("Results"));
 
         // Render stuff
         frame.render_widget(help_msg, help_area);
@@ -119,8 +118,11 @@ impl App {
     }
 
     fn get_results(& mut self, matcher: &mut Matcher) {
-        self.results = Pattern::parse(&self.search, CaseMatching::Ignore, Normalization::Smart).match_list(&self.contents, matcher).into_iter().map(|x| x.0.to_owned()).collect();
-        //TODO Update Results widget
+        self.results = Pattern::parse(&self.search, CaseMatching::Ignore, Normalization::Smart)
+            .match_list(&self.contents, matcher)
+            .into_iter()
+            .map(|x| x.0.to_owned())
+            .collect();
     }
 
     fn delete_char(& mut self, matcher: &mut Matcher) {
@@ -140,7 +142,7 @@ impl App {
                     KeyCode::Char('q') => {
                         self.exit = true;
                     }
-                    KeyCode::Char('f') => {
+                    KeyCode::Char('/') => {
                         self.input_mode = InputMode::Editing;
                     }
                     _ => {}
@@ -159,52 +161,16 @@ impl App {
     }
 }
 
-fn parse_mana_cost(cost: String) {
-    let new_cost: Vec<char> = cost.as_str().chars().filter(|x| *x != '}').filter(|x| *x != '{').collect();
-    let first = new_cost[0];
-    let mut mana: Vec<card::NormalManaSymbol> = vec![];
-    // println!("{:?}", new_cost);
-    match first {
-        'W' => mana.push(card::NormalManaSymbol::White),
-        'U' => mana.push(card::NormalManaSymbol::Blue),
-        'B' => mana.push(card::NormalManaSymbol::Black),
-        'R' => mana.push(card::NormalManaSymbol::Red),
-        'G' => mana.push(card::NormalManaSymbol::Green),
-        'C' => mana.push(card::NormalManaSymbol::Colorless),
-        'S' => mana.push(card::NormalManaSymbol::Snow),
-        _ => {}
-    }
-    
-}
-
+// MAKES IT RUN
 fn main() -> io::Result<()> {
-    // let cards = read_to_string("../temp/data/cards.json").expect("Bad data").to_string();
-    // let json_cards: serde_json::Value = serde_json::from_str(&cards).expect("Not well formatted");
-    // let card = json_cards[0].clone();
-    // parse_card(card);
-    parse_mana_cost("{W}{W}{B}{3}".to_string());
-    
-    Ok(())
+    let mut term = ratatui::init();
+    let app_result = App::new().run(&mut term);
+    ratatui::restore();
+    app_result
 }
 
 // fn main() -> io::Result<()> {
-//     let mut term = ratatui::init();
-//     let app_result = App::new().run(&mut term);
-//     ratatui::restore();
-//     app_result
-// }
-
-// fn main() -> io::Result<()> {
-//     let file_path = "cards.txt"; 
-// 
-//     let file = File::open(file_path).expect("File not found.");
-//     let buf = BufReader::new(file);
-//     let contents: Vec<String> = buf.lines().map(|l| l.expect("Could not parse")).collect();
-// 
-//     let mut matcher = Matcher::new(Config::DEFAULT);
-// 
-//     let matches = Pattern::parse("Angel", CaseMatching::Ignore, Normalization::Smart).match_list(contents, &mut matcher);
-//     println!("{:?}", matches);
-// 
+//     let db_file = "/home/wil/Documents/school/software/project/db";
+//     let db = AllCardsDb::open(db_file)?;       
 //     Ok(())
 // }
