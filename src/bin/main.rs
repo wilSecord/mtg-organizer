@@ -230,6 +230,10 @@ fn center(area: Rect, horizontal: Constraint, vertical: Constraint) -> Rect {
     area
 }
 
+fn save_decklist(deck: Vec<String>) {
+    panic!("Not implemented");
+}
+
 // MAKES IT RUN
 fn main() -> io::Result<()> {
     let mut term = ratatui::init();
