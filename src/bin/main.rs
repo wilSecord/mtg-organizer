@@ -4,10 +4,12 @@ use std::fs::{File, read_to_string};
 use serde_json;
 use nucleo_matcher::pattern::{Normalization, CaseMatching, Pattern};
 use nucleo_matcher::{Matcher, Config};
-use crossterm::event::{self, Event, KeyCode, KeyEventKind};
-use ratatui::{ layout::{Constraint, Direction, Layout}, style::{Color, Style},
+use crossterm::event::{self, Event, KeyCode, KeyEventKind, KeyModifiers};
+use ratatui::{ 
+    layout::{Constraint, Direction, Layout, Flex, Rect}, 
+    style::{Color, Style, Stylize},
     text::{Line, Text},
-    widgets::{Block, Paragraph},
+    widgets::{Block, List, ListState, Paragraph},
     DefaultTerminal, Frame,
 };
 
@@ -16,8 +18,7 @@ use project::query;
 
 
 enum InputMode {
-    Normal,
-    Editing,
+    Normal, Editing, Decklist,
 }
 
 // Setup App struct
@@ -27,6 +28,9 @@ struct App {
     exit: bool,
     contents: Vec<String>,
     results: Vec<String>,
+    selected: usize,
+    decklist: Vec<String>,
+    decklist_selected: usize,
 }
 
 // Implement App
@@ -39,6 +43,9 @@ impl App {
             exit: false,
             contents: Vec::new(),
             results: Vec::new(),
+            selected: 0,
+            decklist: Vec::new(),
+            decklist_selected: 0,
         }
     }
 
@@ -64,6 +71,7 @@ impl App {
         Ok(()) // ok :+1:
     }
 
+
     fn draw(&self, frame: &mut Frame) {
         // Full layout 
         let total = Layout::default()
@@ -83,6 +91,13 @@ impl App {
             ])
             .split(total[0]);
 
+        let text_pop = Paragraph::new("something").block(Block::bordered().title("Tag"));
+        let popup_area = center(
+            frame.area(),
+            Constraint::Length(20),
+            Constraint::Length(5)
+        );
+
         let help_area = left[0];      // Area for keybinds/help text
         let input_area = left[1];     // Area for input box                 || TODO: Refactor to searchbar
         let body_area = left[2];      // Area for results box               || TODO: Rename this
@@ -92,8 +107,8 @@ impl App {
         let search = Paragraph::new(self.search.as_str())
             // Change style based on if the person is typing in it or not
             .style(match self.input_mode {
-                InputMode::Normal => Style::default(),
                 InputMode::Editing => Style::default().fg(Color::Yellow),
+                _ => Style::default(),
             })
             .block(Block::bordered().title("Input")); // Set border as box
         
@@ -102,18 +117,40 @@ impl App {
         let (msg, style) = match self.input_mode {
             InputMode::Normal => ("Normal", Style::default()),
             InputMode::Editing => ("Editing", Style::default()),
+            InputMode::Decklist => ("Decklist", Style::default()),
         };
         let text = Text::from(Line::from(msg)).patch_style(style);
         let help_msg = Paragraph::new(text);
         
         // Results area
-        let body = Paragraph::new(self.results.join("\n")).block(Block::bordered().title("Results"));
+        // let body = Paragraph::new(self.results.join("\n")).block(Block::bordered().title("Results"));
+        let mut state = ListState::default();
+        let body = List::new(self.results.clone())
+            .block(Block::bordered().title("Results"))
+            .highlight_style(Style::new().reversed());
+
+        match self.input_mode {
+                InputMode::Normal => state.select(Some(self.selected)),
+                _ => state.select(None),
+            }
+
+        // Decklist area
+        let mut deck_state = ListState::default();
+        let decklist = List::new(self.decklist.clone())
+            .block(Block::bordered().title("Decklist"))
+            .highlight_style(Style::new().reversed());
+
+        match self.input_mode {
+                InputMode::Decklist => deck_state.select(Some(self.decklist_selected)),
+                _ => deck_state.select(None),
+            }
 
         // Render stuff
         frame.render_widget(help_msg, help_area);
+        // frame.render_widget(text_pop, popup_area);
         frame.render_widget(search, input_area);
-        frame.render_widget(body, body_area);
-        frame.render_widget(Paragraph::new("thing").block(Block::bordered().title("Decklist")), decklist_area);
+        frame.render_stateful_widget(body, body_area, &mut state);
+        frame.render_stateful_widget(decklist, decklist_area, &mut deck_state);
 
     }
 
@@ -134,16 +171,20 @@ impl App {
         self.search.push(c);
         self.get_results(matcher);
     }
+    
 
     fn handle_events(&mut self, matcher: &mut Matcher) -> io::Result<()> {
         if let Event::Key(key) = event::read()? {
             match self.input_mode {
                 InputMode::Normal => match key.code {
-                    KeyCode::Char('q') => {
-                        self.exit = true;
-                    }
-                    KeyCode::Char('/') => {
-                        self.input_mode = InputMode::Editing;
+                    KeyCode::Char('q') => self.exit = true,
+                    KeyCode::Char('/') => self.input_mode = InputMode::Editing,
+                    KeyCode::Char('f') => self.input_mode = InputMode::Decklist,
+                    KeyCode::Char('j') => self.selected += 1,
+                    KeyCode::Char('k') => self.selected -= 1,
+                    KeyCode::Enter => {
+                        let sel = self.results[self.selected].clone();
+                        self.decklist.push(sel);
                     }
                     _ => {}
                 }
@@ -154,11 +195,39 @@ impl App {
                     KeyCode::Esc => self.input_mode = InputMode::Normal,
                     _ => {}
                 }
+                InputMode::Decklist if key.kind == KeyEventKind::Press => match key.code {
+                    KeyCode::Char('d') => {
+                        self.decklist.remove(self.decklist_selected);
+                    }
+                    KeyCode::Enter => {
+                        let sel = self.decklist[self.decklist_selected].clone();
+                        self.decklist.push(sel);
+                    }
+                    KeyCode::Char('q') => self.exit = true,
+                    KeyCode::Char('/') => self.input_mode = InputMode::Editing,
+                    KeyCode::Esc => self.input_mode = InputMode::Normal,
+                    KeyCode::Char('j') => self.decklist_selected = if self.decklist_selected < (self.decklist.len() - 1) { self.decklist_selected + 1 } else { 0 },
+                    KeyCode::Char('k') => self.decklist_selected = if self.decklist_selected > 0 { self.decklist_selected - 1 } else { self.decklist.len() - 1 },
+                    _ => {}
+                }
                 _ => {}
             }
+            // if key.modifiers.contains(KeyModifiers::CONTROL) {
+            //     match key.code {
+            //         KeyCode::Char('s') => 
+            //     }
+            // }
         }
         Ok(())
     }
+}
+
+fn center(area: Rect, horizontal: Constraint, vertical: Constraint) -> Rect {
+    let [area] = Layout::horizontal([horizontal])
+        .flex(Flex::Center)
+        .areas(area);
+    let [area] = Layout::vertical([vertical]).flex(Flex::Center).areas(area);
+    area
 }
 
 // MAKES IT RUN
