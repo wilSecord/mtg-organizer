@@ -91,12 +91,13 @@ impl App {
             ])
             .split(total[0]);
 
-        let text_pop = Paragraph::new("something").block(Block::bordered().title("Tag"));
-        let popup_area = center(
-            frame.area(),
-            Constraint::Length(20),
-            Constraint::Length(5)
-        );
+        // let text_pop = Paragraph::new("something").block(Block::bordered().title("Tag"));
+        // let popup_area = center(
+        //     frame.area(),
+        //     Constraint::Length(20),
+        //     Constraint::Length(5)
+        // );
+        // frame.render_widget(text_pop, popup_area);
 
         let help_area = left[0];      // Area for keybinds/help text
         let input_area = left[1];     // Area for input box                 || TODO: Refactor to searchbar
@@ -147,7 +148,6 @@ impl App {
 
         // Render stuff
         frame.render_widget(help_msg, help_area);
-        // frame.render_widget(text_pop, popup_area);
         frame.render_widget(search, input_area);
         frame.render_stateful_widget(body, body_area, &mut state);
         frame.render_stateful_widget(decklist, decklist_area, &mut deck_state);
@@ -180,8 +180,16 @@ impl App {
                     KeyCode::Char('q') => self.exit = true,
                     KeyCode::Char('/') => self.input_mode = InputMode::Editing,
                     KeyCode::Char('f') => self.input_mode = InputMode::Decklist,
-                    KeyCode::Char('j') => self.selected += 1,
-                    KeyCode::Char('k') => self.selected -= 1,
+                    KeyCode::Char('j') => {
+                        if self.results.len() > 0 {
+                            self.selected = if self.selected < (self.results.len() - 1) { self.selected + 1 } else { 0 }
+                        }
+                    }
+                    KeyCode::Char('k') => {
+                        if self.results.len() > 0 {
+                            self.selected = if self.selected > 0 { self.selected - 1 } else { self.results.len() - 1 }
+                        }
+                    }
                     KeyCode::Enter => {
                         let sel = self.results[self.selected].clone();
                         self.decklist.push(sel);
@@ -197,7 +205,13 @@ impl App {
                 }
                 InputMode::Decklist if key.kind == KeyEventKind::Press => match key.code {
                     KeyCode::Char('d') => {
-                        self.decklist.remove(self.decklist_selected);
+                        if self.decklist.len() > 1 {
+                            self.decklist.remove(self.decklist_selected);
+                            self.decklist_selected = if self.decklist_selected == 0 { 0 } else { self.decklist_selected - 1 };
+                        } else if self.decklist.len() == 1 {
+                            self.decklist.remove(self.decklist_selected);
+                            self.input_mode = InputMode::Normal;
+                        }
                     }
                     KeyCode::Enter => {
                         let sel = self.decklist[self.decklist_selected].clone();
@@ -206,17 +220,26 @@ impl App {
                     KeyCode::Char('q') => self.exit = true,
                     KeyCode::Char('/') => self.input_mode = InputMode::Editing,
                     KeyCode::Esc => self.input_mode = InputMode::Normal,
-                    KeyCode::Char('j') => self.decklist_selected = if self.decklist_selected < (self.decklist.len() - 1) { self.decklist_selected + 1 } else { 0 },
-                    KeyCode::Char('k') => self.decklist_selected = if self.decklist_selected > 0 { self.decklist_selected - 1 } else { self.decklist.len() - 1 },
+                    KeyCode::Char('j') => {
+                        if self.decklist.len() > 0 {
+                            self.decklist_selected = if self.decklist_selected < (self.decklist.len() - 1) { self.decklist_selected + 1 } else { 0 }
+                        }
+                    }
+                    KeyCode::Char('k') => {
+                        if self.decklist.len() > 0 {
+                            self.decklist_selected = if self.decklist_selected > 0 { self.decklist_selected - 1 } else { self.decklist.len() - 1 }
+                        }
+                    }
                     _ => {}
                 }
                 _ => {}
             }
-            // if key.modifiers.contains(KeyModifiers::CONTROL) {
-            //     match key.code {
-            //         KeyCode::Char('s') => 
-            //     }
-            // }
+            if key.modifiers.contains(KeyModifiers::CONTROL) {
+                match key.code {
+                    KeyCode::Char('s') => save_decklist(self.decklist.clone()),
+                    _ => ()
+                }
+            }
         }
         Ok(())
     }
