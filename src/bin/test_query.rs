@@ -9,7 +9,6 @@ use project::dbs::indexes::color_combination::ColorCombinationMaybe;
 use project::dbs::indexes::mana_cost::ManaCostCount;
 use project::dbs::indexes::string_lpm::LongestPrefixMatch;
 use serde_json;
-use tree::tree_traits::MultidimensionalParent;
 use std::collections::BTreeMap;
 use std::fs::File;
 use std::io::{self, BufRead, BufReader};
@@ -17,8 +16,36 @@ use std::str::FromStr;
 use std::time::Instant;
 use std::u128;
 use tree::sparse::structure::StoredTree;
+use tree::tree_traits::MultidimensionalParent;
 
-const TESTS: usize = 10_000;
+const TESTS: usize = 100;
+
+macro_rules! run_test_on_index {
+    ($name:literal : $gen_func:expr => $db:ident.$qfunc:ident) => {{
+        let mut total_found = 0usize;
+
+        let start = Instant::now();
+
+        for i in 0..TESTS {
+            let query = $gen_func(i);
+            total_found += $db.$qfunc(&query).count();
+        }
+
+        let end = Instant::now();
+
+        let test_dur_ms = (end - start).as_secs_f64() * 1000.0;
+        let avg_res_per_search = (total_found as f64) / (TESTS as f64);
+        let avg_time_per_search = test_dur_ms / (TESTS as f64);
+
+        let testname = $name;
+
+        println!(
+            "\nTEST INDEX: {testname}\n===
+            Ran {TESTS} iterations in {test_dur_ms}ms, found {total_found} cumulative results
+            (average of {avg_res_per_search} results and {avg_time_per_search}ms per search)"
+        );
+    }};
+}
 
 fn main() -> io::Result<()> {
     let db_file = std::env::args()
@@ -27,30 +54,15 @@ fn main() -> io::Result<()> {
 
     let db = AllCardsDb::open(db_file).expect("Could not open <db_file>");
 
-    let mut total_found = 0usize;
+    run_test_on_index!("color": make_color_combination_maybe => db.query_color);
+    run_test_on_index!("mana": make_mana_query => db.query_mana);
+    run_test_on_index!("type": make_type_query => db.query_type);
 
-    let start = Instant::now();
-
-    for i in 0..TESTS {
-        let query = LongestPrefixMatch::new_prefix(make_type_query(i));
-        total_found += db.query_type(&query).count();
-    }
-
-    let end = Instant::now();
-
-    let test_dur_ms = (end - start).as_secs_f64() * 1000.0;
-    let avg_res_per_search = (total_found as f64) / (TESTS as f64);
-    let avg_time_per_search = test_dur_ms / (TESTS as f64);
-
-    println!(
-        "Ran {TESTS} iterations in {test_dur_ms}ms, found {total_found} cumulative results
-            (average of {avg_res_per_search} results and {avg_time_per_search}ms per search)"
-    );
-
+    
     Ok(())
 }
 
-fn make_type_query(index: usize) -> &'static str {
+fn make_type_query(index: usize) -> LongestPrefixMatch {
     let t = [
         "Adventure",
         "Advisor",
@@ -202,10 +214,10 @@ fn make_type_query(index: usize) -> &'static str {
         "Zombie",
     ];
 
-    return t[index % t.len()];
+    return LongestPrefixMatch::new_prefix(t[index % t.len()].to_ascii_lowercase());
 }
 
-fn make_mana_query(mut index: usize) -> ManaCostCount::Query {    
+fn make_mana_query(mut index: usize) -> ManaCostCount::Query {
     let field_querying = index % 12;
     index /= 12;
     let value_querying = index % 5;
@@ -236,7 +248,7 @@ fn make_mana_query(mut index: usize) -> ManaCostCount::Query {
         9 => num_any_split_generic = value_querying..=value_querying,
         10 => num_variables_used = value_querying..=value_querying,
         11 => num_odd_edge_case_symbols = value_querying..=value_querying,
-        _ => unreachable!()
+        _ => unreachable!(),
     }
 
     ManaCostCount::Query {

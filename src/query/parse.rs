@@ -1,12 +1,20 @@
-use crate::query::{
-    err_warn_support::{Message, MessageSeverity, MessageSink},
-    lex::{Token, TokenType, lex},
+use crate::{
+    data_model::card::Card,
+    query::{
+        err_warn_support::{Message, MessageSeverity, MessageSink},
+        lex::{Token, TokenType, lex},
+    },
 };
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct SearchQuery<'a> {
-    source_range: std::ops::Range<usize>,
-    query: SearchQueryTree<'a>,
+    pub source_range: std::ops::Range<usize>,
+    pub query: SearchQueryTree<'a>,
+}
+impl SearchQuery<'_> {
+    pub fn naive_matches_card(&self, card: &Card) -> bool {
+        self.query.naive_matches_card(card)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -14,6 +22,57 @@ pub enum SearchQueryTree<'a> {
     And(Vec<SearchQuery<'a>>),
     Or(Vec<SearchQuery<'a>>),
     Term(SearchTerm<'a>),
+}
+impl<'sqt> SearchQueryTree<'sqt> {
+    fn naive_matches_card(&self, card: &Card) -> bool {
+        match self {
+            SearchQueryTree::And(items) => items.iter().all(|x| x.naive_matches_card(card)),
+            SearchQueryTree::Or(items) => items.iter().any(|x| x.naive_matches_card(card)),
+            SearchQueryTree::Term(search_term) => search_term.naive_matches_card(card),
+        }
+    }
+    pub fn is_and(&self) -> bool {
+        match &self {
+            SearchQueryTree::And(_) => true,
+            _ => false,
+        }
+    }
+    pub fn is_or(&self) -> bool {
+        match &self {
+            SearchQueryTree::Or(_) => true,
+            _ => false,
+        }
+    }
+
+    pub fn children(&self) -> Option<&Vec<SearchQuery<'sqt>>> {
+        match self {
+            SearchQueryTree::And(items) |
+            SearchQueryTree::Or(items) => Some(items),
+            _ => None
+        }
+    }
+    pub fn children_mut<'s>(&'s mut self) -> Option<&'s mut Vec<SearchQuery<'sqt>>> {
+        match self {
+            SearchQueryTree::And(items) |
+            SearchQueryTree::Or(items) => Some(items),
+            _ => None
+        }
+    }
+
+    fn is_empty(&self) -> bool {
+        match &self {
+            SearchQueryTree::And(c) | SearchQueryTree::Or(c) => c.is_empty(),
+            SearchQueryTree::Term(_) => false,
+        }
+    }
+    
+    pub fn into_children(self) -> Option<Vec<SearchQuery<'sqt>>> {
+        match self {
+            SearchQueryTree::And(items) |
+            SearchQueryTree::Or(items) => Some(items),
+            _ => None
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -50,6 +109,10 @@ impl<'a> SearchTerm<'a> {
 
             TokenType::OpenParen | TokenType::Or | TokenType::CloseParen => None,
         }
+    }
+
+    fn naive_matches_card(&self, card: &Card) -> bool {
+        false
     }
 }
 
@@ -117,8 +180,12 @@ pub fn parse<'a, 'b>(
             _ => unreachable!("All other cases should be convertable into a token"),
         }
     }
-
-    if current_list.len() == 1 {
+    if current_list.len() == 0 {
+        return Some(SearchQuery {
+            source_range: source_start.unwrap_or_default()..source_end,
+            query: SearchQueryTree::Term(SearchTerm::Term("")),
+        });
+    } else if current_list.len() == 1 {
         return Some(current_list.pop().unwrap());
     } else {
         return Some(SearchQuery {
@@ -189,8 +256,10 @@ fn test_parser() {
         "pow>tou c:w t:creature",
         "devotion:{u/b}{u/b}{u/b}",
         "-fire c:r t:instant",
-        "through (depths or sands or mists)",
+        "through (depths or sands or miscts)",
         "t:legendary (t:goblin or t:elf)",
+        "",
+        "ape (man) horn",
     ] {
         dbg!(parse_str(src, DebugPrintMessages));
     }

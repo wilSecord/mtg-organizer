@@ -68,9 +68,17 @@ impl AllCardsDb {
         self.types
             .find_entries_in_box(&q)
             .flat_map(|(slp, x)| {
-                dbg!(slp);
-                self.cards.get_readref(&dbg!(x))
+                self.cards.get_readref(&x)
             })
+    }
+
+    pub fn query_type_for_id<'a>(
+        &'a self,
+        q: &'a LongestPrefixMatch,
+    ) -> impl Iterator<Item = (StringPrefix, CardDbId)> + 'a {
+        self.types
+            .find_entries_in_box(&q)
+            .map(|(c, id)| (c, CardDbId(id)))
     }
 
     pub fn query_color<'a>(
@@ -179,6 +187,9 @@ impl AllCardsDb {
         }
 
         for typ in card.subtypes.iter() {
+            if(typ == "Adventure") {
+                dbg!("yeah it's an adventure");
+            }
             let pkey = StringPrefix::new_prefix(typ.as_str().to_ascii_lowercase());
             self.types.insert(pkey, id);
         }

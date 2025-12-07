@@ -66,6 +66,13 @@ macro_rules! layout_all_cards_db {
 
             $( pub(super) $index_name: DBTree<$index_dim, $index_type, u128>, )*
         }
+        impl AllCardsDb {
+            pub fn condense(&mut self) {
+                self.cards.condense();
+
+                $(self.$index_name.condense();)*
+            }
+        }
         pub fn initialize_or_deserialize_db_layout(storage: &MultitypePagedStorage<{tree::PAGE_SIZE}, std::fs::File>) -> std::io::Result<AllCardsDb> {
             let known_layout_page_id = unsafe { PageId::from_index(std::num::NonZero::new(1).unwrap()) } ;
             match StoreByPage::<AllCardsDbLayout>::get(storage, &known_layout_page_id, ()) {

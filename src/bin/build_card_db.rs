@@ -299,7 +299,7 @@ fn main() -> io::Result<()> {
     //try to remove the old database. no sweat if it doesn't work.
     let _ = std::fs::remove_file(&db_file);
 
-    let db = AllCardsDb::open(db_file).expect("Could not open <db_file>");
+    let mut db = AllCardsDb::open(db_file).expect("Could not open <db_file>");
 
     let cards_arr = match json_cards {
         serde_json::Value::Array(values) => values,
@@ -329,6 +329,9 @@ fn main() -> io::Result<()> {
 
         eprint!("{i}/{card_last_idx} \u{1b}[0E");
     }
+
+    eprintln!("Garbage collecting DB...");
+    db.condense();
 
     Ok(())
 }

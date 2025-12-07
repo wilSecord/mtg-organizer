@@ -128,6 +128,23 @@ pub struct ColorCombination {
     pub colorless: bool,
 }
 
+#[macro_export]
+macro_rules! color_combo {
+    ( $($letter:ident )* ) => {
+        {
+            let mut f = ColorCombination::default();
+            $( $crate::color_combo!((letter) $letter, f); )*
+            f
+        }
+    };
+    ((letter) w, $f:expr) => { $f.white = true; };
+    ((letter) u, $f:expr) => { $f.blue = true; };
+    ((letter) b, $f:expr) => { $f.black = true; };
+    ((letter) r, $f:expr) => { $f.red = true; };
+    ((letter) g, $f:expr) => { $f.green = true; };
+    ((letter) c, $f:expr) => { $f.colorless = true; };
+}
+
 #[derive(Debug, Clone, Copy, Hash)]
 pub enum NormalManaSymbol {
     White,
