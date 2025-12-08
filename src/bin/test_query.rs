@@ -58,7 +58,6 @@ fn main() -> io::Result<()> {
     run_test_on_index!("mana": make_mana_query => db.query_mana);
     run_test_on_index!("type": make_type_query => db.query_type);
 
-    
     Ok(())
 }
 
