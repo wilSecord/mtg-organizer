@@ -2,7 +2,10 @@ use crossterm::event::{self, Event, KeyCode, KeyEventKind, KeyModifiers};
 use nucleo_matcher::pattern::{CaseMatching, Normalization, Pattern};
 use nucleo_matcher::{Config, Matcher};
 use project::query::compile::build_search_query;
-use project::query::err_warn_support::MessageSink;
+use project::query::err_warn_support::MessageSeverity::{Error, Warning};
+use project::query::err_warn_support::{Message, MessageSink};
+use ratatui::style::Modifier;
+use ratatui::text::Span;
 use ratatui::{
     DefaultTerminal, Frame,
     layout::{Constraint, Direction, Flex, Layout, Rect},
@@ -36,7 +39,7 @@ enum InputMode {
 struct App {
     search: String,
     input_mode: InputMode,
-    err_line: String,
+    err_line: Option<Message>,
     exit: bool,
     results: Vec<String>,
     selected: usize,
@@ -55,7 +58,7 @@ impl App {
             search: String::new(),
             input_mode: InputMode::Normal,
             exit: false,
-            err_line: String::new(),
+            err_line: None,
             results: Vec::new(),
             selected: 0,
             decklist: Vec::new(),
@@ -155,7 +158,21 @@ impl App {
                         Style::default(),
                     ),
                     InputMode::Editing => (
-                        Line::from(format!("Search | Esc/Enter | {}", self.err_line)),
+                        match &self.err_line {
+                            Some(msg) => Line::default().spans([
+                                Span::from("Search | "),
+                                match msg.msg_type {
+                                    Warning => Span::styled("", (Color::Yellow, Modifier::BOLD)),
+                                    Error => Span::styled("", (Color::Red, Modifier::BOLD)),
+                                },
+                                Span::from(" "),
+                                Span::styled(&msg.msg_content, match msg.msg_type {
+                                    Warning => Color::Yellow,
+                                    Error => Color::Red
+                                })
+                            ]),
+                            None => Line::from("Search | Esc/Enter: Results"),
+                        },
                         Style::default(),
                     ),
                     InputMode::Decklist => (
@@ -218,7 +235,7 @@ impl App {
         // }
     }
 
-    fn handle_events(&mut self, query_sender: &mut Sender<String>, results_receiver: &mut Receiver<(String, Vec<String>)>) -> io::Result<bool> {
+    fn handle_events(&mut self, query_sender: &mut Sender<String>, results_receiver: &mut Receiver<(Option<Message>, Vec<String>)>) -> io::Result<bool> {
         if let Ok(t) = results_receiver.try_recv() {
             self.err_line = t.0;
             self.results = t.1;
