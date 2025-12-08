@@ -1,3 +1,16 @@
+pub fn intersect<T: Ord + Copy>(
+    a: &std::ops::RangeInclusive<T>,
+    b: &std::ops::RangeInclusive<T>,
+) -> Option<std::ops::RangeInclusive<T>> {
+    let intersect_start = std::cmp::max(*a.start(), *b.start());
+    let intersect_end = std::cmp::min(*a.end(), *b.end());
+
+    if intersect_end < intersect_start {
+        return None;
+    }
+    return Some(intersect_start..=intersect_end);
+}
+
 macro_rules! count {
     ( $h:ident $($t:ident)* ) => {
         1 + $crate::dbs::indexes::helpers::count!($($t)*)
@@ -18,16 +31,15 @@ macro_rules! if_empty_else {
     };
     ($i:ident $true:tt $false:tt) => {
         $false
-    }
-
+    };
 }
 
 macro_rules! make_index_types {
     (
         key $keyname:ident {
-            $( 
+            $(
                 $(#[$serde_kind:ident])?
-                $fieldname:ident: $fieldtype:ty $(,)? 
+                $fieldname:ident: $fieldtype:ty $(,)?
             )*
         }
     ) => {
@@ -142,7 +154,7 @@ macro_rules! make_index_types {
                             self.$fieldname.fast_minimally_serialize(write_to, ())?
                         });
                     )*
-                    
+
                     Ok(())
                 }
 
@@ -164,13 +176,21 @@ macro_rules! make_index_types {
                 }
 
                 fn fast_seek_after<R: std::io::Read>(from: &mut R) -> std::io::Result<()> {
-                    
+
                     Self::fast_deserialize_minimal(from, ()).map(|_| ())
                 }
             }
             #[derive(Debug, Clone, PartialEq, Eq)]
             pub struct Query {
                 $( pub $fieldname : std::ops::RangeInclusive<$fieldtype>, )*
+            }
+
+            impl Query {
+                pub fn intersect(&self, other: &Self) -> Option<Self> {
+                    Some(Self{
+                        $( $fieldname: $crate::dbs::indexes::helpers::intersect(&self.$fieldname, &other.$fieldname)?, )*
+                    })
+                }
             }
 
             #[derive(Debug, Clone, Copy)]

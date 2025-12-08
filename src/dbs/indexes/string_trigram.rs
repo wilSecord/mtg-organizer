@@ -55,7 +55,7 @@ pub fn string_trigrams(field: u8, s: &str) -> impl Iterator<Item = trigram::Key>
     let short_fallback_iter = (bytes.len() < 3)
         .then(|| trigram::Key {
             index: 0,
-            chars: abc_as_u32(bytes, field)
+            chars: abc_as_u32(bytes, field),
         })
         .into_iter();
 
@@ -64,7 +64,7 @@ pub fn string_trigrams(field: u8, s: &str) -> impl Iterator<Item = trigram::Key>
         .enumerate()
         .map(move |(i, window)| trigram::Key {
             index: i,
-            chars: abc_as_u32(window, field)
+            chars: abc_as_u32(window, field),
         });
 
     return short_fallback_iter.chain(normal_case_iter);

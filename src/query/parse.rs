@@ -46,16 +46,14 @@ impl<'sqt> SearchQueryTree<'sqt> {
 
     pub fn children(&self) -> Option<&Vec<SearchQuery<'sqt>>> {
         match self {
-            SearchQueryTree::And(items) |
-            SearchQueryTree::Or(items) => Some(items),
-            _ => None
+            SearchQueryTree::And(items) | SearchQueryTree::Or(items) => Some(items),
+            _ => None,
         }
     }
     pub fn children_mut<'s>(&'s mut self) -> Option<&'s mut Vec<SearchQuery<'sqt>>> {
         match self {
-            SearchQueryTree::And(items) |
-            SearchQueryTree::Or(items) => Some(items),
-            _ => None
+            SearchQueryTree::And(items) | SearchQueryTree::Or(items) => Some(items),
+            _ => None,
         }
     }
 
@@ -65,12 +63,11 @@ impl<'sqt> SearchQueryTree<'sqt> {
             SearchQueryTree::Term(_) => false,
         }
     }
-    
+
     pub fn into_children(self) -> Option<Vec<SearchQuery<'sqt>>> {
         match self {
-            SearchQueryTree::And(items) |
-            SearchQueryTree::Or(items) => Some(items),
-            _ => None
+            SearchQueryTree::And(items) | SearchQueryTree::Or(items) => Some(items),
+            _ => None,
         }
     }
 }

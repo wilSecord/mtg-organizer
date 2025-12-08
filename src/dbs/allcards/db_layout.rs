@@ -135,7 +135,7 @@ layout_all_cards_db! {
     color: ColorCombination: 6 dimensional,
     color_id: ColorCombination:  6 dimensional,
     mana_cost: ManaCostCount::Key: 12 dimensional,
-    fulltext: string_trigram::trigram::Key: 2 dimensional,
     types: string_lpm::StringPrefix: 1 dimensional,
+    card_names: string_lpm::StringPrefix: 1 dimensional,
     stats: card_stats::Key: 6 dimensional,
 }

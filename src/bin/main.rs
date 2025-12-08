@@ -1,11 +1,8 @@
-use std::any::type_name;
-use std::path::Path;
-use std::io::{self, BufRead, BufReader};
-use std::fs::{File, read_to_string, read_dir};
-use serde_json;
-use nucleo_matcher::pattern::{Normalization, CaseMatching, Pattern};
-use nucleo_matcher::{Matcher, Config};
 use crossterm::event::{self, Event, KeyCode, KeyEventKind, KeyModifiers};
+use nucleo_matcher::pattern::{CaseMatching, Normalization, Pattern};
+use nucleo_matcher::{Config, Matcher};
+use project::query::compile::build_search_query;
+use project::query::err_warn_support::MessageSink;
 use ratatui::{
     DefaultTerminal, Frame,
     layout::{Constraint, Direction, Flex, Layout, Rect},
@@ -13,21 +10,34 @@ use ratatui::{
     text::{Line, Text},
     widgets::{Block, List, ListState, Paragraph},
 };
+use serde_json;
+use std::any::type_name;
+use std::cell::OnceCell;
+use std::fs::{File, read_dir, read_to_string};
+use std::io::{self, BufRead, BufReader};
+use std::path::Path;
+use std::sync::mpsc::{Receiver, Sender};
+use std::sync::{Arc, Mutex};
+use std::time::Duration;
 
 use project::dbs::allcards::AllCardsDb;
-use project::query;
+use project::query::{self, start_query_running_background_threads};
 
 #[derive(PartialEq)]
 enum InputMode {
-    Normal, Editing, Decklist, Saving, Opening,
+    Normal,
+    Editing,
+    Decklist,
+    Saving,
+    Opening,
 }
 
 // Setup App struct
 struct App {
     search: String,
     input_mode: InputMode,
+    err_line: String,
     exit: bool,
-    contents: Vec<String>,
     results: Vec<String>,
     selected: usize,
     decklist: Vec<String>,
@@ -45,7 +55,7 @@ impl App {
             search: String::new(),
             input_mode: InputMode::Normal,
             exit: false,
-            contents: Vec::new(),
+            err_line: String::new(),
             results: Vec::new(),
             selected: 0,
             decklist: Vec::new(),
@@ -59,21 +69,23 @@ impl App {
     pub fn run(&mut self, term: &mut DefaultTerminal) -> io::Result<()> {
         //TODO: Make the matcher object and contents able to be read by get_results()
 
-        // TEMP
-        // TEMP
-        let db_file = "/home/wil/Documents/school/software/project/db";
+        let db_file = "db";
         let db = AllCardsDb::open(db_file)?;
-        self.contents = db.all_cards().map(|x| x.name).collect::<Vec<_>>();
+        let db = Arc::new(db);
 
         // TEMP
         // TEMP
 
-        let mut matcher = Matcher::new(Config::DEFAULT);
+        let (mut query_sender, mut search_result_receiver) = start_query_running_background_threads(db);
+
+        term.draw(|frame| self.draw(frame))?; // Drawing
 
         // As long as self.exit == true, run the gameloop stuff (drawing, handling inputs)
         while !self.exit {
-            term.draw(|frame| self.draw(frame))?; // Drawing
-            self.handle_events(&mut matcher)?; // Handling inputs
+            
+            if self.handle_events(&mut query_sender, &mut search_result_receiver)? { // Handling inputs
+                term.draw(|frame| self.draw(frame))?; // Drawing
+            }
         }
         Ok(()) // ok :+1:
     }
@@ -81,148 +93,146 @@ impl App {
     fn draw(&self, frame: &mut Frame) {
         match self.input_mode {
             InputMode::Saving => {
-                let text_pop = Paragraph::new(self.deckname.as_str()).block(Block::bordered().title("Name"));
-                let popup_area = center(
-                    frame.area(),
-                    Constraint::Length(20),
-                    Constraint::Length(3)
-                );
+                let text_pop =
+                    Paragraph::new(self.deckname.as_str()).block(Block::bordered().title("Name"));
+                let popup_area =
+                    center(frame.area(), Constraint::Length(20), Constraint::Length(3));
                 frame.render_widget(text_pop, popup_area);
-
-            },
+            }
             InputMode::Opening => {
                 let mut open_state = ListState::default();
                 let open_popup = List::new(self.files.clone())
                     .block(Block::bordered().title("Results"))
                     .highlight_style(Style::new().reversed());
-                let open_area = center(
-                    frame.area(),
-                    Constraint::Length(40),
-                    Constraint::Length(50)
-                );
+                let open_area =
+                    center(frame.area(), Constraint::Length(40), Constraint::Length(50));
                 match self.input_mode {
-                        InputMode::Opening => open_state.select(Some(self.file_selected)),
-                        _ => open_state.select(None),
-                    }
+                    InputMode::Opening => open_state.select(Some(self.file_selected)),
+                    _ => open_state.select(None),
+                }
                 frame.render_stateful_widget(open_popup, open_area, &mut open_state);
             }
             _ => {
-            // Full layout 
-            let total = Layout::default()
-                .direction(Direction::Horizontal)
-                .constraints([
-                    Constraint::Percentage(75),
-                    Constraint::Percentage(25),
-                ]).split(frame.area());
-            
-            // Setting up the left side of the screen
-            let left = Layout::default()
-                .direction(Direction::Vertical) // Multiple tiles on top of each other
-                .constraints([
-                    Constraint::Length(1), // Help line
-                    Constraint::Length(3), // Input box
-                    Constraint::Min(1),    // Results box
-                ])
-                .split(total[0]);
+                // Full layout
+                let total = Layout::default()
+                    .direction(Direction::Horizontal)
+                    .constraints([Constraint::Percentage(75), Constraint::Percentage(25)])
+                    .split(frame.area());
 
+                // Setting up the left side of the screen
+                let left = Layout::default()
+                    .direction(Direction::Vertical) // Multiple tiles on top of each other
+                    .constraints([
+                        Constraint::Length(1), // Help line
+                        Constraint::Length(3), // Input box
+                        Constraint::Min(1),    // Results box
+                    ])
+                    .split(total[0]);
 
-            let help_area = left[0];      // Area for keybinds/help text
-            let input_area = left[1];     // Area for input box                 || TODO: Refactor to searchbar
-            let body_area = left[2];      // Area for results box               || TODO: Rename this
-            let decklist_area = total[1]; // Area for decklist (rename this?)
-            let results_height = body_area.height as usize - 2;
-            let mut offset = 0;
+                let help_area = left[0]; // Area for keybinds/help text
+                let input_area = left[1]; // Area for input box                 || TODO: Refactor to searchbar
+                let body_area = left[2]; // Area for results box               || TODO: Rename this
+                let decklist_area = total[1]; // Area for decklist (rename this?)
+                let results_height = body_area.height as usize - 2;
+                let mut offset = 0;
 
-            // Outline the searchbar/input box
-            let search = Paragraph::new(self.search.as_str())
-                // Change style based on if the person is typing in it or not
-                .style(match self.input_mode {
-                    InputMode::Editing => Style::default().fg(Color::Yellow),
-                    _ => Style::default(),
-                })
-                .block(Block::bordered().title("Input")); // Set border as box
-            
-            // Help text area
-            // TODO: Change this lol
-            let (msg, style) = match self.input_mode {
-                InputMode::Normal => ("Normal | A: Add | F: Decklist | Q: Quit | /: Search | Ctrl-S: Save | [K/J]: Up/Down", Style::default()),
-                InputMode::Editing => ("", Style::default()),
-                InputMode::Decklist => ("Decklist | Enter: Add | D: Delete | Ctrl-S: Save | Esc: Results | Q: Quit | [K/J]: Up/Down", Style::default()),
-                InputMode::Saving => ("Saving", Style::default()),
-                InputMode::Opening => ("Opening", Style::default()),
-            };
-            let text = Text::from(Line::from(msg)).patch_style(style);
-            let help_msg = Paragraph::new(text);
-            
-            // Results area
-            // let body = Paragraph::new(self.results.join("\n")).block(Block::bordered().title("Results"));
-            if self.selected > results_height {
-                offset += self.selected - results_height;
-            }
+                // Outline the searchbar/input box
+                let search = Paragraph::new(self.search.as_str())
+                    // Change style based on if the person is typing in it or not
+                    .style(match self.input_mode {
+                        InputMode::Editing => Style::default().fg(Color::Yellow),
+                        _ => Style::default(),
+                    })
+                    .block(Block::bordered().title("Input")); // Set border as box
 
-            let mut state = ListState::default();
-            let body = if self.results.len() > results_height {
-                List::new(self.results[offset..(results_height + offset)].iter().map(String::as_str))
+                // Help text area
+                // TODO: Change this lol
+                let (line, style) = match self.input_mode {
+                    InputMode::Normal => (
+                        Line::from(
+                            "Normal | A: Add | F: Decklist | Q: Quit | /: Search | Ctrl-S: Save | [K/J]: Up/Down",
+                        ),
+                        Style::default(),
+                    ),
+                    InputMode::Editing => (
+                        Line::from(format!("Search | Esc/Enter | {}", self.err_line)),
+                        Style::default(),
+                    ),
+                    InputMode::Decklist => (
+                        Line::from(
+                            "Decklist | Enter: Add | D: Delete | Ctrl-S: Save | Esc: Results | Q: Quit | [K/J]: Up/Down",
+                        ),
+                        Style::default(),
+                    ),
+                    InputMode::Saving => (Line::from("Saving"), Style::default()),
+                    InputMode::Opening => (Line::from("Opening"), Style::default()),
+                };
+                let text = Text::from(line).patch_style(style);
+                let help_msg = Paragraph::new(text);
+
+                // Results area
+                // let body = Paragraph::new(self.results.join("\n")).block(Block::bordered().title("Results"));
+                if self.selected > results_height {
+                    offset += self.selected - results_height;
+                }
+
+                let mut state = ListState::default();
+                let body = if self.results.len() > results_height {
+                    List::new(
+                        self.results[offset..(results_height + offset)]
+                            .iter()
+                            .map(String::as_str),
+                    )
                     .block(Block::bordered().title("Results"))
                     .highlight_style(Style::new().reversed())
-            } else {
-                List::new(self.results.clone())
-                    .block(Block::bordered().title("Results"))
-                    .highlight_style(Style::new().reversed())
-            };
+                } else {
+                    List::new(self.results.clone())
+                        .block(Block::bordered().title("Results"))
+                        .highlight_style(Style::new().reversed())
+                };
 
-            match self.input_mode {
+                match self.input_mode {
                     InputMode::Normal => state.select(Some(self.selected)),
                     _ => state.select(None),
                 }
 
-            // Decklist area
-            let mut deck_state = ListState::default();
-            let decklist = List::new(self.decklist.clone())
-                .block(Block::bordered().title("Decklist"))
-                .highlight_style(Style::new().reversed());
+                // Decklist area
+                let mut deck_state = ListState::default();
+                let decklist = List::new(self.decklist.clone())
+                    .block(Block::bordered().title("Decklist"))
+                    .highlight_style(Style::new().reversed());
 
-            match self.input_mode {
+                match self.input_mode {
                     InputMode::Decklist => deck_state.select(Some(self.decklist_selected)),
                     _ => deck_state.select(None),
                 }
 
-            // Render stuff
-            frame.render_widget(help_msg, help_area);
-            frame.render_widget(search, input_area);
-            frame.render_stateful_widget(body, body_area, &mut state);
-            frame.render_stateful_widget(decklist, decklist_area, &mut deck_state);
-        } 
+                // Render stuff
+                frame.render_widget(help_msg, help_area);
+                frame.render_widget(search, input_area);
+                frame.render_stateful_widget(body, body_area, &mut state);
+                frame.render_stateful_widget(decklist, decklist_area, &mut deck_state);
+            }
         }
 
         // }
-
     }
 
-    fn get_results(&mut self, matcher: &mut Matcher) {
-        self.results = Pattern::parse(&self.search, CaseMatching::Ignore, Normalization::Smart)
-            .match_list(&self.contents, matcher)
-            .into_iter()
-            .map(|x| x.0.to_owned())
-            .collect();
-    }
+    fn handle_events(&mut self, query_sender: &mut Sender<String>, results_receiver: &mut Receiver<(String, Vec<String>)>) -> io::Result<bool> {
+        if let Ok(t) = results_receiver.try_recv() {
+            self.err_line = t.0;
+            self.results = t.1;
+            return Ok(true);
+        }
+        if !event::poll(Duration::from_millis(100))? {
+            return Ok(false);
+        }
 
-    fn delete_char(&mut self, matcher: &mut Matcher) {
-        self.search.pop();
-        self.get_results(matcher);
-    }
-
-    fn add_char(&mut self, c: char, matcher: &mut Matcher) {
-        self.search.push(c);
-        self.get_results(matcher);
-    }
-
-    fn handle_events(&mut self, matcher: &mut Matcher) -> io::Result<()> {
         if let Event::Key(key) = event::read()? {
             match self.input_mode {
                 InputMode::Normal => match key.code {
                     KeyCode::Char('q') => self.exit = true,
-                    KeyCode::Char('/') => { 
+                    KeyCode::Char('/') => {
                         self.input_mode = InputMode::Editing;
                         self.selected = 0;
                     }
@@ -253,8 +263,14 @@ impl App {
                 },
                 InputMode::Editing if key.kind == KeyEventKind::Press => match key.code {
                     KeyCode::Enter => self.input_mode = InputMode::Normal,
-                    KeyCode::Backspace => self.delete_char(matcher),
-                    KeyCode::Char(c) => self.add_char(c, matcher),
+                    KeyCode::Backspace => {
+                        self.search.pop();
+                        query_sender.send(self.search.clone()).unwrap();
+                    },
+                    KeyCode::Char(c) => {
+                        self.search.push(c);
+                        query_sender.send(self.search.clone()).unwrap();
+                    },
                     KeyCode::Esc => self.input_mode = InputMode::Normal,
                     _ => {}
                 },
@@ -277,7 +293,7 @@ impl App {
                         self.decklist.push(sel);
                     }
                     KeyCode::Char('q') => self.exit = true,
-                    KeyCode::Char('/') => { 
+                    KeyCode::Char('/') => {
                         self.input_mode = InputMode::Editing;
                         self.selected = 0;
                     }
@@ -302,37 +318,57 @@ impl App {
                         }
                     }
                     _ => {}
-                }
+                },
                 InputMode::Saving if key.kind == KeyEventKind::Press => match key.code {
                     KeyCode::Enter => {
-                        let _ =  save_decklist(&self.decklist, &self.deckname);
+                        let _ = save_decklist(&self.decklist, &self.deckname);
                         self.input_mode = InputMode::Normal;
                     }
-                    KeyCode::Esc => {self.input_mode = InputMode::Normal;}
-                    KeyCode::Char(c) => {self.deckname.push(c);}
-                    KeyCode::Backspace => {self.deckname.pop();}
+                    KeyCode::Esc => {
+                        self.input_mode = InputMode::Normal;
+                    }
+                    KeyCode::Char(c) => {
+                        self.deckname.push(c);
+                    }
+                    KeyCode::Backspace => {
+                        self.deckname.pop();
+                    }
                     _ => {}
-                }
+                },
                 InputMode::Opening if key.kind == KeyEventKind::Press => match key.code {
                     KeyCode::Enter => {
-                        self.decklist = load_decklist(&(std::env::home_dir().unwrap_or("".into()).join("Downloads").join(self.files[self.file_selected].clone()).as_path()))?;
+                        self.decklist = load_decklist(
+                            &(std::env::home_dir()
+                                .unwrap_or("".into())
+                                .join("Downloads")
+                                .join(self.files[self.file_selected].clone())
+                                .as_path()),
+                        )?;
                         self.input_mode = InputMode::Normal;
                     }
                     KeyCode::Char('j') => {
                         if self.files.len() > 0 {
-                            self.file_selected = if self.file_selected < (self.files.len() - 1) { self.file_selected + 1 } else { 0 }
+                            self.file_selected = if self.file_selected < (self.files.len() - 1) {
+                                self.file_selected + 1
+                            } else {
+                                0
+                            }
                         }
                     }
                     KeyCode::Char('k') => {
                         if self.files.len() > 0 {
-                            self.file_selected = if self.file_selected > 0 { self.file_selected - 1 } else { self.files.len() - 1 }
+                            self.file_selected = if self.file_selected > 0 {
+                                self.file_selected - 1
+                            } else {
+                                self.files.len() - 1
+                            }
                         }
                     }
                     KeyCode::Esc => {
                         self.input_mode = InputMode::Normal;
                     }
                     _ => {}
-                }
+                },
 
                 _ => {}
             }
@@ -341,26 +377,20 @@ impl App {
                     KeyCode::Char('s') => self.input_mode = InputMode::Saving,
                     KeyCode::Char('o') => {
                         self.input_mode = InputMode::Opening;
-                        self.files = read_dir(std::env::home_dir()
-                            .unwrap_or("".into())
-                            .join("Downloads"))
-                            .unwrap()
-                            .filter_map(|f| f.ok())
-                            .filter(|f| f.file_name()
-                                .into_string()
+                        self.files =
+                            read_dir(std::env::home_dir().unwrap_or("".into()).join("Downloads"))
                                 .unwrap()
-                                .ends_with(".txt"))
-                            .map(|f| f.file_name()
-                                .into_string()
-                                .unwrap())
-                            .collect();
-  
+                                .filter_map(|f| f.ok())
+                                .filter(|f| f.file_name().into_string().unwrap().ends_with(".txt"))
+                                .map(|f| f.file_name().into_string().unwrap())
+                                .collect();
                     }
-                    _ => ()
+                    _ => (),
                 }
             }
         }
-        Ok(())
+
+        Ok(true)
     }
 }
 
@@ -397,16 +427,15 @@ fn load_decklist(deck_file: &Path) -> std::io::Result<Vec<String>> {
         let mut line = line?;
         //split_off will remove the name for us, which lets us simply parse
         // the number of cards from the remaining line content.
-        
+
         let card_name = line.split_off(line.find(" ").unwrap_or_default());
         let card_name_trimmed = card_name.trim();
-        
+
         let num_repeats: usize = line.parse().unwrap_or(1);
 
         for _ in 0..num_repeats {
             r.push(card_name_trimmed.to_string());
         }
-
     }
 
     Ok(r)

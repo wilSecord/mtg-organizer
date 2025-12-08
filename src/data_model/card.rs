@@ -30,7 +30,7 @@ pub struct PhysicalCard {
 pub struct Card {
     pub name: String,
     pub mana_cost: ManaCost,
-    /// This is multiplied by 4 because 
+    /// This is multiplied by 4 because
     /// of cards with non-integer mana values.
     /// Currently, only cards with .5 mana values
     /// exist, but tokens can be created with .25

@@ -9,7 +9,7 @@ pub struct Message {
 #[derive(Debug)]
 pub enum MessageSeverity {
     Warning,
-    Error
+    Error,
 }
 
 pub trait MessageSink {
@@ -24,7 +24,6 @@ impl<T: MessageSink> MessageSink for &T {
 
 pub struct IgnoreMessages;
 
-
 impl MessageSink for IgnoreMessages {
     fn send(&self, msg: Message) {
         drop(msg);
@@ -37,6 +36,9 @@ pub struct DebugPrintMessages;
 #[cfg(debug_assertions)]
 impl MessageSink for DebugPrintMessages {
     fn send(&self, msg: Message) {
-        eprintln!("QUERY LANG {:?} at character {}: {}", msg.msg_type, msg.byte_pos, msg.msg_content);
+        eprintln!(
+            "QUERY LANG {:?} at character {}: {}",
+            msg.msg_type, msg.byte_pos, msg.msg_content
+        );
     }
 }

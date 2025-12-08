@@ -16,6 +16,30 @@ pub struct ColorCombinationMaybe {
     pub green: Option<bool>,
     pub colorless: Option<bool>,
 }
+impl ColorCombinationMaybe {
+    pub fn intersect(&self, other: &Self) -> Option<Self> {
+        Some(Self {
+            white: intersect_option_bools(self.white, other.white)?,
+            blue: intersect_option_bools(self.blue, other.blue)?,
+            black: intersect_option_bools(self.black, other.black)?,
+            red: intersect_option_bools(self.red, other.red)?,
+            green: intersect_option_bools(self.green, other.green)?,
+            colorless: intersect_option_bools(self.colorless, other.colorless)?,
+        })
+    }
+}
+
+fn intersect_option_bools(a: Option<bool>, b: Option<bool>) -> Option<Option<bool>> {
+    match (a, b) {
+        (None, None) => Some(None),
+        (None, Some(_)) => Some(b),
+        (Some(_), None) => Some(a),
+        (Some(false), Some(false)) => Some(Some(false)),
+        (Some(true), Some(true)) => Some(Some(true)),
+        (Some(false), Some(true)) => None,
+        (Some(true), Some(false)) => None,
+    }
+}
 
 impl SerializeMinimal for ColorCombinationMaybe {
     type ExternalData<'s> = ();

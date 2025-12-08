@@ -1,36 +1,55 @@
-use std::sync::{mpsc::{Receiver, Sender}, Arc};
+use std::sync::{mpsc::{Receiver, Sender}, Arc, Mutex};
 
-use crate::{data_model::card::Card, dbs::allcards::AllCardsDb, query::{err_warn_support::MessageSink, parse::{parse, parse_str, SearchQuery, SearchQueryTree}}};
+use nucleo_matcher::{pattern::{CaseMatching, Normalization, Pattern}, Config, Matcher};
 
-struct DbQuerier {
-    card_db: Arc<AllCardsDb>,
-    current_results: Vec<Card>,
-    update_pipe: Sender<String>
+use crate::{dbs::allcards::AllCardsDb, query::{compile::build_search_query, err_warn_support::{self, Message, MessageSink}}};
+
+pub fn start_query_running_background_threads(db: Arc<AllCardsDb>) -> (Sender<String>, Receiver<(String, Vec<String>)>) {
+    let (tx_query, rx_query) = std::sync::mpsc::channel::<String>();
+    let (tx_results, rx_results) = std::sync::mpsc::channel();
+
+    let mut matcher = Matcher::new(Config::DEFAULT);
+
+    std::thread::spawn(move|| loop {
+        let Ok(search) = rx_query.recv() else {
+            break;
+        };
+
+        let mut messageline = String::new();
+        let results = get_results(search.as_str(), &mut messageline, &mut matcher, &db);
+
+        tx_results.send((search, results)).unwrap();
+    });
+
+    (tx_query, rx_results)
 }
 
-impl DbQuerier {
-    pub fn new(card_db: Arc<AllCardsDb>) -> Self {
-        let (tx, rx) = std::sync::mpsc::channel();
+fn get_results(search: &str, messageline: &mut String, matcher: &mut Matcher, db: &AllCardsDb) -> Vec<String> {
+        struct ErrLineMessage<'s>(Mutex<&'s mut String>);
+        impl MessageSink for ErrLineMessage<'_> {
+            fn send(&self, msg: Message) {
+                **self.0.lock().unwrap() = msg.msg_content;
+            }
+        }
 
-        Self {
-            card_db,
-            current_results: Vec::new(),
-            update_pipe: tx
+        messageline.truncate(0);
+
+        let errors = ErrLineMessage(Mutex::new(messageline));
+
+        let query = build_search_query(&search, &errors);
+
+        match query {
+            Ok(query) => return query.query_db(&db).map(|x| x.name).collect(),
+            Err(simple_search) => {
+                return Pattern::parse(
+                    simple_search.as_str(),
+                    CaseMatching::Ignore,
+                    Normalization::Smart,
+                )
+                .match_list(db.all_cards().map(|x| x.name), matcher)
+                .into_iter()
+                .map(|x| x.0.to_owned())
+                .collect();
+            }
         }
     }
-}
-
-fn start_update_loop(card_db: Arc<AllCardsDb>, search_query_update: Receiver<String>, on_update: Sender<()>) {
-    let card_db = Arc::clone(&card_db);
-
-    std::thread::spawn(move || {
-        for search_query in search_query_update.iter() {
-            let q = todo!();
-        }
-    });
-}
-
-pub fn search_card_database<'a>(card_db: &'a AllCardsDb, query: Option<SearchQuery<'a>>, msgs: impl MessageSink + 'a) -> impl Iterator<Item = Card> {
-
-    query.into_iter().flat_map(|query| card_db.all_cards().filter(move |card| query.naive_matches_card(card)))
-}

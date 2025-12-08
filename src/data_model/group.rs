@@ -12,5 +12,5 @@ struct CardGroup {
 
 // TODO: have Wil add more varieties based on what's actually used
 enum CardGroupVariety {
-    Deck, 
+    Deck,
 }

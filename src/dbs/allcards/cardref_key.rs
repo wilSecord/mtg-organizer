@@ -56,5 +56,9 @@ pub fn index_to_card_ref(idx: u128) -> CardRef {
         .map(NonZeroUsize::new)
         .expect("Printing number should be embedded in index");
 
-    CardRef { set, collector_number, printing }
+    CardRef {
+        set,
+        collector_number,
+        printing,
+    }
 }

@@ -1,4 +1,7 @@
-use crate::{data_model::card::{Rarity, Supertype}, dbs::indexes::helpers::make_index_types};
+use crate::{
+    data_model::card::{Rarity, Supertype},
+    dbs::indexes::helpers::make_index_types,
+};
 
 make_index_types! {
     key rarity {
@@ -15,7 +18,7 @@ impl rarity::Key {
                 Rarity::Rare => 2,
                 Rarity::Mythic => 3,
                 Rarity::Special => 4,
-            }
+            },
         }
     }
 }
@@ -37,7 +40,7 @@ impl supertype::Key {
                 Supertype::World => 4,
                 Supertype::Elite => 5,
                 Supertype::Host => 6,
-            }
+            },
         }
     }
 }

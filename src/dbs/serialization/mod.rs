@@ -150,7 +150,7 @@ fn read_supertype_list(read_from: &mut impl std::io::Read) -> std::io::Result<Ve
     let mut vec = Vec::new();
     let mut b = read_from.read_one()?;
 
-    //check for the 'empty list' sigil: 
+    //check for the 'empty list' sigil:
     //TWO 'final elements' in the same byte.
     //if we experience that, end right away!
     //
@@ -227,7 +227,7 @@ fn write_supertype_list(
             // decoding a single-elem list from seeing two final
             // elements and deciding that it's none.
             b |= 0b1111;
-        } 
+        }
 
         write_to.write_all(&[b])?;
     }
@@ -279,7 +279,6 @@ impl DeserializeFromMinimal for CardDynamicNumber {
         _: Self::ExternalData<'d>,
     ) -> Result<Self, std::io::Error> {
         usize::deserialize_minimal(from, ()).map(Self::from_repr_usize)
-
     }
 }
 
@@ -440,7 +439,7 @@ fn byte_to_mana_symbol(ms: u8) -> std::io::Result<ManaSymbol> {
         _ => {}
     }
 
-    //handle the generic mana case, which is any 2MSB set to 0b11 
+    //handle the generic mana case, which is any 2MSB set to 0b11
     //and 6LSB above 41.
     if ms & 0b1100_0000 != 0 && ms & 0b0011_1111 >= 42 {
         let num = (ms & 0b11_1111) as usize - 42;

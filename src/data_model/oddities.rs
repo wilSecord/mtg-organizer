@@ -47,13 +47,18 @@ impl<T: FromStr + DeserializeFromMinimal> DeserializeFromMinimal for Stringish<T
         let sig = first_byte >> 6;
 
         if sig == 0b10 {
-            Ok(Stringish::Alternative(String::deserialize_minimal(from, first_byte.into())?))
+            Ok(Stringish::Alternative(String::deserialize_minimal(
+                from,
+                first_byte.into(),
+            )?))
         } else {
-            Ok(Stringish::Normal(T::deserialize_minimal(from, external_data)?))
+            Ok(Stringish::Normal(T::deserialize_minimal(
+                from,
+                external_data,
+            )?))
         }
     }
 }
-
 
 ///
 /// A string that is normally a number, but can be something else.
@@ -78,7 +83,7 @@ impl FromStr for StringishUsize {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.parse() {
             Ok(n) => Ok(Self::Number(n)),
-            _ => Ok(Self::String(s.to_string()))
+            _ => Ok(Self::String(s.to_string())),
         }
     }
 }
@@ -111,7 +116,8 @@ impl SerializeMinimal for StringishUsize {
                 let first_byte_is_end_flag = (rest_of_bits == 0) as u8;
                 let variant_flag = 0b0;
 
-                let first_byte = (variant_flag << 7) | (first_byte_is_end_flag << 6) | bits_to_put_in_first_byte;
+                let first_byte =
+                    (variant_flag << 7) | (first_byte_is_end_flag << 6) | bits_to_put_in_first_byte;
 
                 first_byte.minimally_serialize(write_to, ())?;
 
@@ -140,21 +146,23 @@ impl DeserializeFromMinimal for StringishUsize {
         let variant_flag = first_byte >> 7;
 
         if variant_flag == 0b1 {
-            Ok(StringishUsize::String(String::deserialize_minimal(from, first_byte.into())?))
+            Ok(StringishUsize::String(String::deserialize_minimal(
+                from,
+                first_byte.into(),
+            )?))
         } else {
             let first_byte_is_end = ((first_byte >> 6) & 0b1) != 0;
             let bits_from_first_byte = first_byte & 0b111_111;
 
             if first_byte_is_end {
-                return Ok(StringishUsize::Number(bits_from_first_byte as usize))
-            } 
+                return Ok(StringishUsize::Number(bits_from_first_byte as usize));
+            }
 
             let rest_of_bits = usize::deserialize_minimal(from, ())?;
 
             let number = (rest_of_bits << 6) | (bits_from_first_byte as usize);
 
             Ok(StringishUsize::Number(number))
-            
         }
     }
 }

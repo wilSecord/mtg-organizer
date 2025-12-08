@@ -1,4 +1,7 @@
-use std::{ops::{Add, Sub}, usize};
+use std::{
+    ops::{Add, Sub},
+    usize,
+};
 
 use tree::tree_traits::{
     Average, MaxValue, MinValue, MultidimensionalKey, MultidimensionalParent, Zero,
@@ -26,7 +29,7 @@ impl card_stats::Key {
             power: card.power.as_repr_usize(),
             toughness: card.toughness.as_repr_usize(),
             loyalty: card.loyalty.as_repr_usize(),
-            defense: card.defense + 1,
+            defense: card.defense,
             game_changer: card.game_changer as u8,
             mana_value_quarters: card.mana_value_times_4,
         }

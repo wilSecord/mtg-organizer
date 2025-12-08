@@ -115,9 +115,11 @@ pub fn lex<'b, 'a: 'b>(
 
                 if !word_src.is_empty() {
                     let tkn =
-                        word_to_token(word_src, &messages, word_src_range.clone()).map(|token| Token {
-                            token,
-                            source_range: word_src_range,
+                        word_to_token(word_src, &messages, word_src_range.clone()).map(|token| {
+                            Token {
+                                token,
+                                source_range: word_src_range,
+                            }
                         });
 
                     return tkn;
@@ -278,17 +280,23 @@ fn test_lexer() {
     use crate::query::err_warn_support::DebugPrintMessages;
 
     assert_eq!(
-        lex(r#"!"sift through sands""#, &DebugPrintMessages).map(|x| x.token).collect::<Vec<_>>(),
+        lex(r#"!"sift through sands""#, &DebugPrintMessages)
+            .map(|x| x.token)
+            .collect::<Vec<_>>(),
         vec![TokenType::Exact("sift through sands")]
     );
 
     assert_eq!(
-        lex(r#"o:"~ enters tapped" "#, &DebugPrintMessages).map(|x| x.token).collect::<Vec<_>>(),
+        lex(r#"o:"~ enters tapped" "#, &DebugPrintMessages)
+            .map(|x| x.token)
+            .collect::<Vec<_>>(),
         vec![TokenType::KeyVal("o", "~ enters tapped")]
     );
 
     assert_eq!(
-        lex("not:reprint e:c16", &DebugPrintMessages).map(|x| x.token).collect::<Vec<_>>(),
+        lex("not:reprint e:c16", &DebugPrintMessages)
+            .map(|x| x.token)
+            .collect::<Vec<_>>(),
         vec![
             TokenType::KeyVal("not", "reprint"),
             TokenType::KeyVal("e", "c16")
@@ -296,12 +304,16 @@ fn test_lexer() {
     );
 
     assert_eq!(
-        lex("is:dual", &DebugPrintMessages).map(|x| x.token).collect::<Vec<_>>(),
+        lex("is:dual", &DebugPrintMessages)
+            .map(|x| x.token)
+            .collect::<Vec<_>>(),
         vec![TokenType::KeyVal("is", "dual")]
     );
 
     assert_eq!(
-        lex("c>=br is:spell f:duel", &DebugPrintMessages).map(|x| x.token).collect::<Vec<_>>(),
+        lex("c>=br is:spell f:duel", &DebugPrintMessages)
+            .map(|x| x.token)
+            .collect::<Vec<_>>(),
         vec![
             TokenType::KeyGte("c", "br"),
             TokenType::KeyVal("is", "spell"),
@@ -310,7 +322,9 @@ fn test_lexer() {
     );
 
     assert_eq!(
-        lex("pow>tou c:w t:creature", &DebugPrintMessages).map(|x| x.token).collect::<Vec<_>>(),
+        lex("pow>tou c:w t:creature", &DebugPrintMessages)
+            .map(|x| x.token)
+            .collect::<Vec<_>>(),
         vec![
             TokenType::KeyGt("pow", "tou"),
             TokenType::KeyVal("c", "w"),
@@ -319,12 +333,16 @@ fn test_lexer() {
     );
 
     assert_eq!(
-        lex("devotion:{u/b}{u/b}{u/b}", &DebugPrintMessages).map(|x| x.token).collect::<Vec<_>>(),
+        lex("devotion:{u/b}{u/b}{u/b}", &DebugPrintMessages)
+            .map(|x| x.token)
+            .collect::<Vec<_>>(),
         vec![TokenType::KeyVal("devotion", "{u/b}{u/b}{u/b}")]
     );
 
     assert_eq!(
-        lex("-fire c:r t:instant", &DebugPrintMessages).map(|x| x.token).collect::<Vec<_>>(),
+        lex("-fire c:r t:instant", &DebugPrintMessages)
+            .map(|x| x.token)
+            .collect::<Vec<_>>(),
         vec![
             TokenType::NegTerm("fire"),
             TokenType::KeyVal("c", "r"),
@@ -333,7 +351,9 @@ fn test_lexer() {
     );
 
     assert_eq!(
-        lex("through (depths or sands or mists)", &DebugPrintMessages).map(|x| x.token).collect::<Vec<_>>(),
+        lex("through (depths or sands or mists)", &DebugPrintMessages)
+            .map(|x| x.token)
+            .collect::<Vec<_>>(),
         vec![
             TokenType::Term("through"),
             TokenType::OpenParen,
@@ -347,7 +367,9 @@ fn test_lexer() {
     );
 
     assert_eq!(
-        lex("t:legendary (t:goblin or t:elf)", &DebugPrintMessages).map(|x| x.token).collect::<Vec<_>>(),
+        lex("t:legendary (t:goblin or t:elf)", &DebugPrintMessages)
+            .map(|x| x.token)
+            .collect::<Vec<_>>(),
         vec![
             TokenType::KeyVal("t", "legendary"),
             TokenType::OpenParen,
